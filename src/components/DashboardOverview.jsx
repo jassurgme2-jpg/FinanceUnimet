@@ -1,7 +1,7 @@
 import React from "react";
 import { formatCurrency, getMonthsList, getMonthNameRU, calculatePnL, calculateCashFlow } from "../financialCalculations";
 
-export default function DashboardOverview({ transactions, audits, onNavigateToTab }) {
+export default function DashboardOverview({ transactions, audits }) {
   const months = getMonthsList(transactions);
   
   // Calculate Totals
@@ -339,13 +339,6 @@ export default function DashboardOverview({ transactions, audits, onNavigateToTa
                   </div>
                 )}
 
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => onNavigateToTab("audits")} 
-                  style={{ width: "100%", fontSize: "12px", padding: "8px" }}
-                >
-                  Перейти в Центр Аудита
-                </button>
               </div>
             ) : (
               <p style={{ color: "var(--success)", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>

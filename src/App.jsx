@@ -6,16 +6,11 @@ import PnLReport from "./components/PnLReport";
 import CashFlowReport from "./components/CashFlowReport";
 import BalanceSheet from "./components/BalanceSheet";
 import ReconciliationAct from "./components/ReconciliationAct";
-import AuditCenter from "./components/AuditCenter";
 import DataGraphView from "./components/DataGraphView";
 import DataImporter from "./components/DataImporter";
 import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
-import TransactionManager from "./components/TransactionManager";
-import BudgetGoalManager from "./components/BudgetGoalManager";
 import { logout } from "./auth";
 import {
-  DEFAULT_APPS_SCRIPT_TOKEN,
-  DEFAULT_APPS_SCRIPT_URL,
   DEFAULT_AUTO_CONVERT,
   DEFAULT_EXCHANGE_RATE,
   DEFAULT_GOOGLE_API_KEY,
@@ -94,9 +89,7 @@ export default function App() {
   const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID);
   const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY);
 
-  // Apps Script & Conversion States
-  const [appsScriptUrl, setAppsScriptUrl] = useState(localStorage.getItem("gs_apps_script_url") || DEFAULT_APPS_SCRIPT_URL);
-  const [appsScriptToken, setAppsScriptToken] = useState(localStorage.getItem("gs_apps_script_token") || DEFAULT_APPS_SCRIPT_TOKEN);
+  // Conversion States
   const [exchangeRate, setExchangeRate] = useState(localStorage.getItem("gs_exchange_rate") || DEFAULT_EXCHANGE_RATE);
   const [autoConvert, setAutoConvert] = useState(storedAutoConvert === null ? DEFAULT_AUTO_CONVERT : storedAutoConvert !== "false");
 
@@ -168,7 +161,6 @@ export default function App() {
     setSelectedSheet("");
     setSheetId("");
     setApiKey("");
-    setAppsScriptUrl("");
     setBalanceSourceData(null);
   };
 
@@ -179,8 +171,8 @@ export default function App() {
     activeSheet = "", 
     sId = "", 
     key = "",
-    scriptUrl = "",
-    scriptToken = "",
+    _scriptUrl = "",
+    _scriptToken = "",
     rate = 12800,
     convert = true
   ) => {
@@ -197,8 +189,6 @@ export default function App() {
     setSelectedSheet(activeSheet || "Все листы (Консолидировано)");
     if (sId) setSheetId(sId);
     if (key) setApiKey(key);
-    if (scriptUrl) setAppsScriptUrl(scriptUrl);
-    if (scriptToken) setAppsScriptToken(scriptToken);
     if (rate) setExchangeRate(rate);
     setAutoConvert(convert);
     setBalanceSourceData(null);
@@ -1158,22 +1148,6 @@ export default function App() {
           </button>
 
           <button
-            className={`btn btn-secondary ${activeTab === "transaction-manager" ? "btn-primary" : ""}`}
-            style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "transaction-manager" ? "var(--primary)" : "transparent" }}
-            onClick={() => setActiveTab("transaction-manager")}
-          >
-            📝 Ввод операций
-          </button>
-
-          <button
-            className={`btn btn-secondary ${activeTab === "budget-goals" ? "btn-primary" : ""}`}
-            style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "budget-goals" ? "var(--primary)" : "transparent" }}
-            onClick={() => setActiveTab("budget-goals")}
-          >
-            🎯 Бюджеты и Цели
-          </button>
-
-          <button
             className={`btn btn-secondary ${activeTab === "pnl" ? "btn-primary" : ""}`}
             style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "pnl" ? "var(--primary)" : "transparent" }}
             onClick={() => setActiveTab("pnl")}
@@ -1203,24 +1177,6 @@ export default function App() {
             onClick={() => setActiveTab("reconciliation")}
           >
             🤝 Акт сверки
-          </button>
-
-          <button
-            className={`btn btn-secondary ${activeTab === "audits" ? "btn-primary" : ""}`}
-            style={{ 
-              justifyContent: "space-between", 
-              width: "100%", 
-              border: "none", 
-              backgroundColor: activeTab === "audits" ? "var(--primary)" : "transparent" 
-            }}
-            onClick={() => setActiveTab("audits")}
-          >
-            <span>🛡️ Центр аудита</span>
-            {audits.total > 0 && (
-              <span className={`badge ${audits.errors.length > 0 ? 'badge-error' : 'badge-warning'}`} style={{ padding: "2px 6px", fontSize: "10px" }}>
-                {audits.total}
-              </span>
-            )}
           </button>
 
           <button
@@ -1299,42 +1255,6 @@ export default function App() {
             <DashboardOverview 
               transactions={transactions} 
               audits={audits}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
-            />
-          )}
-
-          {activeTab === "transaction-manager" && (
-            <TransactionManager 
-              transactions={transactions} 
-              sheetId={sheetId}
-              apiKey={apiKey}
-              appsScriptUrl={appsScriptUrl}
-              appsScriptToken={appsScriptToken}
-              exchangeRate={exchangeRate}
-              autoConvert={autoConvert}
-              onTransactionAdded={(updatedTx, source) => {
-                if (updatedTx) {
-                  setTransactions(updatedTx);
-                  if (source) setSourceName(source);
-                } else {
-                  loadSheetData(sheetId, apiKey, selectedSheet);
-                }
-              }}
-            />
-          )}
-
-          {activeTab === "budget-goals" && (
-            <BudgetGoalManager 
-              transactions={transactions}
-              sheetId={sheetId}
-              apiKey={apiKey}
-              appsScriptUrl={appsScriptUrl}
-              appsScriptToken={appsScriptToken}
-              exchangeRate={exchangeRate}
-              autoConvert={autoConvert}
-              onBudgetOrGoalUpdated={() => {
-                loadSheetData(sheetId, apiKey, selectedSheet);
-              }}
             />
           )}
 
@@ -1352,10 +1272,6 @@ export default function App() {
 
           {activeTab === "reconciliation" && (
             <ReconciliationAct transactions={transactions} />
-          )}
-
-          {activeTab === "audits" && (
-            <AuditCenter transactions={transactions} />
           )}
 
           {activeTab === "graph" && (
