@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { formatCurrency, getMonthsList, getMonthNameRU } from "../financialCalculations";
+import { formatCurrency, getMonthNameRU } from "../financialCalculations";
 
 const DEFAULT_PNL_START_DATE = "2024-10-01";
 const DEFAULT_PNL_END_DATE = "2026-05-31";
@@ -11,11 +11,12 @@ export default function PnLReport({ transactions }) {
   const maxTxDate = txDates[txDates.length - 1] || "2026-06-30";
 
   // Filter and input states
-  const [filterMode, setFilterMode] = useState("range"); // "all", "asOf", "month", "day", "range"
+  const [filterMode, setFilterMode] = useState("all"); // "all", "asOf", "month", "day", "range"
   const [targetDate, setTargetDate] = useState(DEFAULT_PNL_END_DATE);
   const [startDate, setStartDate] = useState(DEFAULT_PNL_START_DATE || minTxDate);
   const [endDate, setEndDate] = useState(DEFAULT_PNL_END_DATE || maxTxDate);
   const [typedDate, setTypedDate] = useState("");
+  const [periodMode, setPeriodMode] = useState("year");
 
   const [expanded, setExpanded] = useState({
     revenue: true,
@@ -124,19 +125,43 @@ export default function PnLReport({ transactions }) {
   const filteredTransactions = getFilteredTransactions();
   const filteredTxCount = filteredTransactions.length;
 
-  // Decide grouping mode (daily vs monthly)
-  const isDaily = filterMode === "day" || (filterMode === "range" && getDayCount(startDate, endDate) <= 15);
-
   const getPeriodKey = (dateStr) => {
-    return isDaily ? dateStr : dateStr.substring(0, 7);
+    if (periodMode === "year") {
+      return dateStr.substring(0, 4);
+    }
+    if (periodMode === "quarter") {
+      const quarter = Math.ceil(Number(dateStr.substring(5, 7)) / 3);
+      return `${dateStr.substring(0, 4)}-Q${quarter}`;
+    }
+    return dateStr.substring(0, 7);
   };
 
   const getPeriodName = (periodKey) => {
-    if (isDaily) {
-      const [year, month, day] = periodKey.split("-");
-      return `${day}.${month}`;
+    if (periodMode === "year") {
+      return periodKey;
     }
-    return getMonthNameRU(periodKey).split(" ")[0];
+    if (periodMode === "quarter") {
+      return periodKey.replace("-Q", " Q");
+    }
+    return getMonthNameRU(periodKey);
+  };
+  const selectedPeriodLabel = {
+    year: "По годам",
+    quarter: "По кварталам",
+    month: "По месяцам"
+  }[periodMode];
+
+  const showFullHistory = () => {
+    setFilterMode("all");
+    setStartDate(minTxDate);
+    setEndDate(maxTxDate);
+    setTargetDate(maxTxDate);
+    setTypedDate("");
+  };
+
+  const handlePeriodModeChange = (nextMode) => {
+    setPeriodMode(nextMode);
+    showFullHistory();
   };
 
   // Generate periods
@@ -338,6 +363,7 @@ export default function PnLReport({ transactions }) {
 
   const monthlyNetProfit = periods.map((m, idx) => monthlyPBT[idx] - monthlyIncomeTax[idx]);
   const totalNetProfit = totalPBT - totalIncomeTax;
+  const pnlTableMinWidth = `${Math.max(980, 260 + 80 + periods.length * 118 + 130 + 90)}px`;
 
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -408,6 +434,37 @@ export default function PnLReport({ transactions }) {
                 }
               }}
             />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>РАЗРЕЗ КОЛОНОК</span>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {[
+                { id: "year", label: "Год" },
+                { id: "quarter", label: "Квартал" },
+                { id: "month", label: "Месяц" }
+              ].map(mode => (
+                <button
+                  key={mode.id}
+                  className="btn"
+                  style={{
+                    minHeight: "40px",
+                    padding: "8px 14px",
+                    fontSize: "12px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: periodMode === mode.id ? "white" : "var(--text-secondary)",
+                    backgroundColor: periodMode === mode.id ? "rgba(34, 211, 238, 0.16)" : "rgba(255, 255, 255, 0.03)",
+                    boxShadow: periodMode === mode.id ? "0 0 0 1px rgba(34, 211, 238, 0.35)" : "none",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease"
+                  }}
+                  onClick={() => handlePeriodModeChange(mode.id)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {filterMode === "asOf" && (
@@ -496,7 +553,7 @@ export default function PnLReport({ transactions }) {
                 />
               </div>
               <span className="badge badge-info" style={{ marginTop: "16px" }}>
-                📊 {getDayCount(startDate, endDate)} дн. ({isDaily ? "По дням" : "По месяцам"})
+                📊 {getDayCount(startDate, endDate)} дн. ({selectedPeriodLabel})
               </span>
             </div>
           )}
@@ -644,7 +701,7 @@ export default function PnLReport({ transactions }) {
           </div>
         ) : (
           <div className="table-container">
-            <table className="fin-table">
+            <table className="fin-table" style={{ minWidth: pnlTableMinWidth }}>
               <thead>
                 <tr>
                   <th style={{ width: "260px" }}>Финансовая статья</th>

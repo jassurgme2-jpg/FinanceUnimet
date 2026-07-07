@@ -184,6 +184,11 @@ const SOURCE_COLUMN_GAP = 14;
 const SOURCE_TOP = 18;
 const SOURCE_LEFT = 22;
 const GRAPH_HEIGHT = 586;
+const REPORT_CARD_WIDTH = 218;
+const REPORT_CARD_HEIGHT = 86;
+const REPORT_RIGHT = 22;
+const REPORT_PORT_X = 1000 - REPORT_RIGHT - REPORT_CARD_WIDTH - 12;
+const REPORT_PORT_PADDING = 15;
 
 const getSourceLayout = (index) => {
   const perColumn = Math.ceil(SOURCE_SHEETS.length / SOURCE_COLUMNS);
@@ -220,16 +225,40 @@ export default function DataGraphView({ sheetMetadata = [] }) {
     balance: 436
   };
 
+  const reportCounts = REPORTS.reduce((acc, report) => {
+    acc[report.id] = SOURCE_SHEETS.filter((source) => source.usedBy.includes(report.id)).length;
+    return acc;
+  }, {});
+
+  const getReportCardHeight = (reportId) => {
+    return Math.min(132, REPORT_CARD_HEIGHT + Math.max(0, reportCounts[reportId] - 8) * 4);
+  };
+
+  const getReportPortY = (reportId, portIndex, portCount) => {
+    if (portCount <= 1) return reportY[reportId];
+
+    const cardHeight = getReportCardHeight(reportId);
+    const cardTop = Math.max(SOURCE_TOP, reportY[reportId] - cardHeight / 2);
+    const portTop = cardTop + REPORT_PORT_PADDING;
+    const portBottom = cardTop + cardHeight - REPORT_PORT_PADDING;
+
+    return portTop + ((portBottom - portTop) * portIndex) / (portCount - 1);
+  };
+
+  const reportPortCursor = {};
   const connections = SOURCE_SHEETS.flatMap((source, sourceIndex) =>
     source.usedBy.map((reportId) => {
       const layout = getSourceLayout(sourceIndex);
+      const portIndex = reportPortCursor[reportId] || 0;
+      reportPortCursor[reportId] = portIndex + 1;
 
       return {
         source,
         report: REPORT_BY_ID.get(reportId),
         startX: layout.startX,
         startY: layout.centerY,
-        endY: reportY[reportId]
+        endY: getReportPortY(reportId, portIndex, reportCounts[reportId]),
+        portIndex
       };
     })
   );
@@ -248,11 +277,6 @@ export default function DataGraphView({ sheetMetadata = [] }) {
     if (!hoveredNode) return false;
     return hoveredNode === report.id || SOURCE_SHEETS.some((source) => source.id === hoveredNode && source.usedBy.includes(report.id));
   };
-
-  const reportCounts = REPORTS.reduce((acc, report) => {
-    acc[report.id] = SOURCE_SHEETS.filter((source) => source.usedBy.includes(report.id)).length;
-    return acc;
-  }, {});
 
   return (
     <div className="animate-fade-in" style={{ width: "100%" }}>
@@ -300,23 +324,39 @@ export default function DataGraphView({ sheetMetadata = [] }) {
             >
               {connections.map((connection, index) => {
                 const active = isConnectionActive(connection);
-                const path = `M ${connection.startX} ${connection.startY} C 585 ${connection.startY}, 620 ${connection.endY}, 748 ${connection.endY}`;
+                const curveStartX = Math.min(connection.startX + 150, REPORT_PORT_X - 150);
+                const curveEndX = REPORT_PORT_X - 74;
+                const path = `M ${connection.startX} ${connection.startY} C ${curveStartX} ${connection.startY}, ${curveEndX} ${connection.endY}, ${REPORT_PORT_X} ${connection.endY}`;
 
                 return (
-                  <path
+                  <g
                     key={`${connection.source.id}-${connection.report.id}-${index}`}
-                    d={path}
-                    fill="none"
-                    stroke={active ? connection.report.color : "rgba(255, 255, 255, 0.04)"}
-                    strokeWidth={active ? 2.2 : 0.8}
-                    vectorEffect="non-scaling-stroke"
-                    style={{
-                      transitionProperty: "stroke, stroke-width, opacity",
-                      transitionDuration: "160ms",
-                      transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
-                      opacity: hoveredNode && !active ? 0.16 : 1
-                    }}
-                  />
+                    style={{ opacity: hoveredNode && !active ? 0.14 : 1 }}
+                  >
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={active ? connection.report.color : "rgba(255, 255, 255, 0.045)"}
+                      strokeWidth={active ? 1.3 : 0.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                      style={{
+                        transitionProperty: "stroke, stroke-width, opacity",
+                        transitionDuration: "160ms",
+                        transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+                      }}
+                    />
+                    {active && (
+                      <circle
+                        cx={REPORT_PORT_X}
+                        cy={connection.endY}
+                        r="1.65"
+                        fill={connection.report.color}
+                        opacity="0.72"
+                      />
+                    )}
+                  </g>
                 );
               })}
             </svg>
@@ -393,10 +433,10 @@ export default function DataGraphView({ sheetMetadata = [] }) {
                   onBlur={() => setHoveredNode(null)}
                   style={{
                     position: "absolute",
-                    top: `${Math.max(SOURCE_TOP, reportY[report.id] - 43)}px`,
+                    top: `${Math.max(SOURCE_TOP, reportY[report.id] - getReportCardHeight(report.id) / 2)}px`,
                     right: 22,
-                    width: 218,
-                    minHeight: "86px",
+                    width: REPORT_CARD_WIDTH,
+                    minHeight: `${getReportCardHeight(report.id)}px`,
                     textAlign: "left",
                     border: active ? `1px solid ${report.color}` : "1px solid var(--border)",
                     borderRadius: "8px",
@@ -465,7 +505,7 @@ export default function DataGraphView({ sheetMetadata = [] }) {
           <div style={{ border: "1px solid var(--border)", borderRadius: "8px", padding: "12px", background: "rgba(255, 255, 255, 0.025)" }}>
             <div style={{ color: "var(--warning)", fontWeight: 800, fontSize: "12px" }}>Баланс</div>
             <div style={{ color: "var(--text-secondary)", fontSize: "11px", marginTop: "4px", lineHeight: 1.45 }}>
-              Источники показаны по LET-формуле; расчет в вебе нужно заменить отдельным следующим шагом.
+              Берет источники по LET-формуле: ТМЗ, ОС, реестры, капитал, займы и связанные стороны.
             </div>
           </div>
         </div>

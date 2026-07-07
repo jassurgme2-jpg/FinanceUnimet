@@ -310,6 +310,51 @@ h1, h2, h3, h4, h5, h6 {
   text-align: right;
 }
 
+.balance-table-container {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.balance-table th,
+.balance-table td {
+  white-space: nowrap;
+}
+
+.balance-table th:first-child,
+.balance-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 176px;
+  max-width: 220px;
+  white-space: normal;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.balance-table th:first-child {
+  z-index: 3;
+  background-color: #151821;
+}
+
+.balance-table td:first-child {
+  background-color: #141722;
+}
+
+.balance-table tr.header-row td:first-child,
+.balance-table tr.subtotal-row td:first-child {
+  background-color: #171a24;
+}
+
+.balance-table tr.total-row td:first-child {
+  background-color: #20232d;
+}
+
+.balance-table th:not(:first-child),
+.balance-table td:not(:first-child) {
+  min-width: 124px;
+}
+
 /* Form Controls */
 .input-group {
   display: flex;

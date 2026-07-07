@@ -165,6 +165,167 @@ const buildPeriodBounds = (month, startDate, endDate) => {
   return { ms: toDateKey(ms), me: toDateKey(me) };
 };
 
+const normalizeSheetDate = (value) => {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value) && value > 20000 && value < 80000) {
+    const date = new Date(Date.UTC(1899, 11, 30 + Math.floor(value)));
+    return toDateKey(date);
+  }
+
+  const raw = value.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  let match = raw.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (match) {
+    const [, y, m, d] = match;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  match = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (match) {
+    const [, d, m, yRaw] = match;
+    const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  return "";
+};
+
+const parseSheetNumber = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value === undefined || value === null || value === "") return 0;
+  const normalized = value
+    .toString()
+    .replace(/\s/g, "")
+    .replace(",", ".")
+    .replace(/[^\d.-]/g, "");
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const addDays = (dateKey, days) => {
+  const date = parseDateValue(dateKey);
+  if (!date) return "";
+  return toDateKey(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days)));
+};
+
+const getMonthEndKey = (month, endDate = "") => {
+  const monthStart = getMonthStart(month);
+  const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+  const end = parseDateValue(endDate);
+  return toDateKey(end && end < monthEnd ? end : monthEnd);
+};
+
+const getContinuousMonths = (startDate, endDate) => {
+  const start = parseDateValue(startDate);
+  const end = parseDateValue(endDate);
+  if (!start || !end || start > end) return [];
+
+  const months = [];
+  let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  while (cursor <= last) {
+    months.push(toDateKey(cursor).slice(0, 7));
+    cursor = addMonths(cursor, 1);
+  }
+  return months;
+};
+
+const getRows = (source, key) => source?.rows?.[key] || [];
+
+const sumByDate = (rows, dateIdx, amountIdx, startDate, cutoffExclusive) => rows.reduce((sum, row) => {
+  const date = normalizeSheetDate(row?.[dateIdx]);
+  if (!date || date < startDate || date >= cutoffExclusive) return sum;
+  return sum + parseSheetNumber(row?.[amountIdx]);
+}, 0);
+
+const sumByDateAndType = (rows, dateIdx, typeIdx, typeValue, amountIdx, startDate, cutoffExclusive) => {
+  const expected = typeValue.toLowerCase();
+  return rows.reduce((sum, row) => {
+    const date = normalizeSheetDate(row?.[dateIdx]);
+    const type = (row?.[typeIdx] || "").toString().trim().toLowerCase();
+    if (!date || date < startDate || date >= cutoffExclusive || type !== expected) return sum;
+    return sum + parseSheetNumber(row?.[amountIdx]);
+  }, 0);
+};
+
+const collectFormulaBalanceDates = (source) => {
+  if (!source?.rows) return [];
+  const specs = [
+    ["bankCash", 2], ["bankCash", 7],
+    ["cashBox", 0], ["cashBox", 4],
+    ["ppe", 0],
+    ["inventoryTrade", 1], ["inventoryTrade", 22],
+    ["inventoryProduction", 1], ["inventoryProduction", 19],
+    ["waste", 1], ["waste", 16],
+    ["wasteAccounting", 0], ["wasteAccounting", 8],
+    ["scrap", 1], ["scrap", 10],
+    ["plasma", 25],
+    ["debtorRegister", 0],
+    ["creditorRegister", 0],
+    ["equity", 0], ["equity", 4],
+    ["loans", 1], ["loans", 6],
+    ["relatedSherzod", 0], ["relatedSherzod", 4],
+    ["relatedKichkina", 0], ["relatedKichkina", 4]
+  ];
+
+  return specs.flatMap(([key, dateIdx]) => getRows(source, key)
+    .map((row) => normalizeSheetDate(row?.[dateIdx]))
+    .filter(Boolean));
+};
+
+const hasFormulaBalanceSource = (source) => Boolean(source?.mode === "formula" && source?.rows);
+
+export const getBalanceSheetMonths = (transactions, balanceSourceData) => {
+  if (!hasFormulaBalanceSource(balanceSourceData)) {
+    return getMonthsList(transactions);
+  }
+
+  const sourceDates = collectFormulaBalanceDates(balanceSourceData);
+  const txDates = transactions.map((tx) => tx.date).filter(Boolean);
+  const allDates = [
+    ...sourceDates,
+    ...txDates,
+    balanceSourceData.reportStartDate,
+    balanceSourceData.reportEndDate
+  ].filter(Boolean).sort();
+
+  const startDate = balanceSourceData.reportStartDate || allDates[0];
+  const endDate = balanceSourceData.reportEndDate || allDates[allDates.length - 1];
+  return getContinuousMonths(startDate, endDate);
+};
+
+export const BALANCE_REPORT_ROWS = [
+  { key: "assetsHeader", id: "", label: "АКТИВЫ", type: "section" },
+  { key: "nonCurrentAssetsHeader", id: "", label: "Внеоборотные активы", type: "section" },
+  { key: "ppe", id: "3", label: "Основные средства" },
+  { key: "totalNonCurrentAssets", id: "4", label: "Итого внеоборотные активы", type: "subtotal" },
+  { key: "currentAssetsHeader", id: "", label: "Оборотные активы", type: "section" },
+  { key: "invTrade", id: "6", label: "ТМЗ - торговля" },
+  { key: "invProd", id: "7", label: "ТМЗ - производство" },
+  { key: "waste", id: "8", label: "Деловые отходы и лом" },
+  { key: "receivables", id: "9", label: "Торговая и прочая дебиторская задолженность (нетто по реестру)" },
+  { key: "relAsset", id: "10", label: "Связанные стороны - дебиторский остаток" },
+  { key: "cash", id: "11", label: "Денежные средства и эквиваленты" },
+  { key: "currentAssets", id: "12", label: "Итого оборотные активы", type: "subtotal" },
+  { key: "totalAssets", id: "13", label: "ИТОГО АКТИВЫ", type: "total" },
+  { key: "equityLiabilitiesHeader", id: "", label: "КАПИТАЛ И ОБЯЗАТЕЛЬСТВА", type: "section" },
+  { key: "equityHeader", id: "", label: "Капитал", type: "section" },
+  { key: "shareCapital", id: "16", label: "Уставный капитал / взносы собственников" },
+  { key: "retained", id: "17", label: "Нераспределенная прибыль / накопленный результат (из ОПиУ)" },
+  { key: "balanceGap", id: "18", label: "Балансировочная разница / нет полной главной книги" },
+  { key: "equity", id: "19", label: "Итого капитал", type: "subtotal" },
+  { key: "longTermLiabilitiesHeader", id: "", label: "Долгосрочные обязательства", type: "section" },
+  { key: "longDebt", id: "21", label: "Долгосрочные займы" },
+  { key: "totalLongTermLiabilities", id: "22", label: "Итого долгосрочные обязательства", type: "subtotal" },
+  { key: "currentLiabilitiesHeader", id: "", label: "Краткосрочные обязательства", type: "section" },
+  { key: "payables", id: "24", label: "Торговая и прочая кредиторская задолженность (нетто по реестру)" },
+  { key: "relLiability", id: "25", label: "Связанные стороны - кредиторский остаток" },
+  { key: "currentLiabilities", id: "26", label: "Итого краткосрочные обязательства", type: "subtotal" },
+  { key: "totalEandL", id: "27", label: "ИТОГО КАПИТАЛ И ОБЯЗАТЕЛЬСТВА", type: "total" },
+  { key: "check", id: "28", label: "Проверка баланса", type: "check" }
+];
+
 const regexAny = /.*/;
 const regexNone = /a^/;
 const regexBorrow = /займ|кредит|international islamic|trade finance|islamic trade|corpotion/i;
@@ -385,8 +546,165 @@ export const calculateCashFlow = (transactions, months, initialBalances = INITIA
   return { cf, monthlyBalances, initialTotal };
 };
 
-// Balance Sheet (cumulative point-in-time calculation)
-export const calculateBalanceSheet = (transactions, months, initialBalances = INITIAL_BALANCES) => {
+const calculateRetainedEarnings = (transactions, startDate, cutoffExclusive) => transactions.reduce((sum, tx) => {
+  if (!tx.date || tx.date < startDate || tx.date >= cutoffExclusive) return sum;
+  const type = getTransactionPnLType(tx);
+  const amount = Number(tx.amount || 0);
+  if (!Number.isFinite(amount) || type === "excluded") return sum;
+
+  if (type === "revenue") return sum + amount;
+  if (type === "otherIncome") {
+    return sum + (tx.type === "Expense" ? -Math.abs(amount) : amount);
+  }
+  if (["cogs", "distribution", "admin", "otherTax", "finance", "incomeTax"].includes(type)) {
+    return sum - Math.abs(amount);
+  }
+  return sum;
+}, 0);
+
+const buildFallbackBalanceRow = (bs) => ({
+  ...bs,
+  ppe: bs.equipment,
+  totalNonCurrentAssets: bs.equipment,
+  invTrade: 0,
+  invProd: 0,
+  waste: 0,
+  receivables: bs.accountsReceivable,
+  relAsset: 0,
+  cash: bs.totalCash,
+  currentAssets: bs.totalCash + bs.accountsReceivable,
+  shareCapital: 0,
+  retained: bs.equity,
+  balanceGap: 0,
+  longDebt: bs.outstandingLoan,
+  totalLongTermLiabilities: bs.outstandingLoan,
+  payables: bs.accountsPayable,
+  relLiability: 0,
+  currentLiabilities: bs.accountsPayable,
+  totalEandL: bs.totalLiabilities + bs.equity,
+  check: bs.totalAssets - (bs.totalLiabilities + bs.equity)
+});
+
+const calculateFormulaBalanceSheet = (transactions, months, source) => {
+  const sourceDates = collectFormulaBalanceDates(source);
+  const txDates = transactions.map((tx) => tx.date).filter(Boolean);
+  const allDates = [
+    ...sourceDates,
+    ...txDates,
+    source.reportStartDate,
+    source.reportEndDate
+  ].filter(Boolean).sort();
+
+  const startDate = source.reportStartDate || allDates[0] || `${months[0] || "2026-01"}-01`;
+  const effectiveEndDate = source.reportEndDate || allDates[allDates.length - 1] || `${months[months.length - 1] || "2026-06"}-30`;
+  const registerStartDate = source.registerStartDate || startDate;
+
+  const bankCash = getRows(source, "bankCash");
+  const cashBox = getRows(source, "cashBox");
+  const ppeRows = getRows(source, "ppe");
+  const invTradeRows = getRows(source, "inventoryTrade");
+  const invProdRows = getRows(source, "inventoryProduction");
+  const wasteRows = getRows(source, "waste");
+  const wasteAccountingRows = getRows(source, "wasteAccounting");
+  const scrapRows = getRows(source, "scrap");
+  const plasmaRows = getRows(source, "plasma");
+  const debtorRows = getRows(source, "debtorRegister");
+  const creditorRows = getRows(source, "creditorRegister");
+  const equityRows = getRows(source, "equity");
+  const loanRows = getRows(source, "loans");
+  const relatedSherzodRows = getRows(source, "relatedSherzod");
+  const relatedKichkinaRows = getRows(source, "relatedKichkina");
+
+  return months.map((month) => {
+    const asOfDate = getMonthEndKey(month, effectiveEndDate);
+    const cutoffExclusive = addDays(asOfDate, 1);
+
+    const cash = (
+      sumByDate(bankCash, 2, 4, startDate, cutoffExclusive)
+      + sumByDate(cashBox, 0, 2, startDate, cutoffExclusive)
+      - sumByDate(bankCash, 7, 9, startDate, cutoffExclusive)
+      - sumByDate(cashBox, 4, 6, startDate, cutoffExclusive)
+    );
+    const ppe = sumByDate(ppeRows, 0, 9, startDate, cutoffExclusive);
+    const invTrade = asOfDate === effectiveEndDate && Number.isFinite(source.insightInventoryFinal)
+      ? source.insightInventoryFinal
+      : sumByDate(invTradeRows, 1, 18, startDate, cutoffExclusive) - sumByDate(invTradeRows, 22, 32, startDate, cutoffExclusive);
+    const invProd = sumByDate(invProdRows, 1, 17, startDate, cutoffExclusive) - sumByDate(invProdRows, 19, 29, startDate, cutoffExclusive);
+    const waste = (
+      sumByDate(wasteRows, 1, 14, startDate, cutoffExclusive)
+      - sumByDate(wasteRows, 16, 24, startDate, cutoffExclusive)
+      + sumByDate(wasteAccountingRows, 0, 6, startDate, cutoffExclusive)
+      - sumByDate(wasteAccountingRows, 8, 14, startDate, cutoffExclusive)
+      + sumByDate(scrapRows, 1, 8, startDate, cutoffExclusive)
+      - sumByDate(scrapRows, 10, 19, startDate, cutoffExclusive)
+      + sumByDate(plasmaRows, 25, 22, startDate, cutoffExclusive)
+    );
+    const arSigned = (
+      sumByDateAndType(debtorRows, 0, 2, "Дебет", 3, registerStartDate, cutoffExclusive)
+      - sumByDateAndType(debtorRows, 0, 2, "Кредит", 3, registerStartDate, cutoffExclusive)
+    );
+    const apSigned = (
+      sumByDateAndType(creditorRows, 0, 1, "Дебет", 2, registerStartDate, cutoffExclusive)
+      - sumByDateAndType(creditorRows, 0, 1, "Кредит", 2, registerStartDate, cutoffExclusive)
+    );
+    const relSigned = (
+      sumByDate(relatedSherzodRows, 0, 2, startDate, cutoffExclusive)
+      - sumByDate(relatedSherzodRows, 4, 7, startDate, cutoffExclusive)
+      + sumByDate(relatedKichkinaRows, 0, 2, startDate, cutoffExclusive)
+      - sumByDate(relatedKichkinaRows, 4, 7, startDate, cutoffExclusive)
+    );
+    const receivables = arSigned;
+    const payables = apSigned;
+    const relAsset = Math.max(0, -relSigned);
+    const currentAssets = invTrade + invProd + waste + receivables + relAsset + cash;
+    const totalAssets = ppe + currentAssets;
+    const shareCapital = sumByDate(equityRows, 0, 2, startDate, cutoffExclusive) - sumByDate(equityRows, 4, 6, startDate, cutoffExclusive);
+    const longDebt = sumByDate(loanRows, 1, 3, startDate, cutoffExclusive) - sumByDate(loanRows, 6, 10, startDate, cutoffExclusive);
+    const relLiability = Math.max(0, relSigned);
+    const currentLiabilities = payables + relLiability;
+    const retained = calculateRetainedEarnings(transactions, startDate, cutoffExclusive);
+    const balanceGap = totalAssets - shareCapital - retained - longDebt - currentLiabilities;
+    const equity = shareCapital + retained + balanceGap;
+    const totalEandL = equity + longDebt + currentLiabilities;
+    const check = totalAssets - totalEandL;
+
+    return {
+      month,
+      asOfDate,
+      formulaMode: true,
+      ppe,
+      totalNonCurrentAssets: ppe,
+      invTrade,
+      invProd,
+      waste,
+      receivables,
+      relAsset,
+      cash,
+      currentAssets,
+      totalAssets,
+      shareCapital,
+      retained,
+      balanceGap,
+      equity,
+      longDebt,
+      totalLongTermLiabilities: longDebt,
+      payables,
+      relLiability,
+      currentLiabilities,
+      totalLiabilities: longDebt + currentLiabilities,
+      totalEandL,
+      check,
+      totalCash: cash,
+      equipment: ppe,
+      accountsReceivable: receivables,
+      accountsPayable: payables,
+      outstandingLoan: longDebt,
+      balanced: Math.abs(check) < 1
+    };
+  });
+};
+
+const calculateFallbackBalanceSheet = (transactions, months, initialBalances = INITIAL_BALANCES) => {
   const balanceSheet = [];
   
   // Sort transactions chronologically
@@ -458,7 +776,7 @@ export const calculateBalanceSheet = (transactions, months, initialBalances = IN
     // Equity = Total Assets - Total Liabilities (Retained Earnings + Initial Capital)
     const equity = totalAssets - totalLiabilities;
 
-    balanceSheet.push({
+    balanceSheet.push(buildFallbackBalanceRow({
       month: m,
       cash,
       totalCash,
@@ -470,10 +788,18 @@ export const calculateBalanceSheet = (transactions, months, initialBalances = IN
       totalLiabilities,
       equity,
       balanced: Math.abs(totalAssets - (totalLiabilities + equity)) < 1
-    });
+    }));
   });
 
   return balanceSheet;
+};
+
+// Balance Sheet based on the Google Sheets LET/MAP formula when raw source ranges are loaded.
+export const calculateBalanceSheet = (transactions, months, initialBalances = INITIAL_BALANCES, balanceSourceData = null) => {
+  if (hasFormulaBalanceSource(balanceSourceData)) {
+    return calculateFormulaBalanceSheet(transactions, months, balanceSourceData);
+  }
+  return calculateFallbackBalanceSheet(transactions, months, initialBalances);
 };
 
 // Auditing System

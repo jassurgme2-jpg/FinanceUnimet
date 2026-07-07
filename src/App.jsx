@@ -72,6 +72,7 @@ const getFormulaPnLGroup = (category) => {
 
 export default function App() {
   const [transactions, setTransactions] = useState([]);
+  const [balanceSourceData, setBalanceSourceData] = useState(null);
   const [sourceName, setSourceName] = useState("Демо-данные (Mock Data)");
   const [activeTab, setActiveTab] = useState("overview");
   const [audits, setAudits] = useState({ warnings: [], errors: [], total: 0 });
@@ -146,6 +147,7 @@ export default function App() {
     setSheetId("");
     setApiKey("");
     setAppsScriptUrl("");
+    setBalanceSourceData(null);
   };
 
   const handleDataLoaded = (
@@ -177,22 +179,55 @@ export default function App() {
     if (scriptToken) setAppsScriptToken(scriptToken);
     if (rate) setExchangeRate(rate);
     setAutoConvert(convert);
+    setBalanceSourceData(null);
     setActiveTab("overview"); // redirect to dashboard overview
   };
 
   // Load consolidated data from P&L source sheets plus cash movement sheets.
   const loadConsolidatedData = async (sId, key) => {
     try {
+      const balanceReportGid = 1842335923;
+      let balanceReportSheetName = "";
+      try {
+        const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sId}?fields=sheets.properties(sheetId,title)&key=${key}`;
+        const metaRes = await fetch(metaUrl);
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          balanceReportSheetName = meta.sheets
+            ?.find((sheet) => sheet.properties?.sheetId === balanceReportGid)
+            ?.properties?.title || "";
+        }
+      } catch (err) {
+        console.warn("Не удалось определить лист балансового отчета по gid:", err);
+      }
+
       const sheetConfigs = [
         { key: "trade", name: "Реализация (торговля)", range: "A3:P10389" },
         { key: "production", name: "Реализация (производство)", range: "A3:AF1000" },
-        { key: "plasma", name: "Реализация (плазморез)", range: "A4:AA5000" },
+        { key: "plasma", name: "Реализация (плазморез)", range: "A4:AA5000", balanceKey: "plasma" },
         { key: "cashback", name: "Реализация (кешбек)", range: "A3:K1000" },
         { key: "expenses", name: "Затраты", range: "A3:I4297" },
         { key: "salary", name: "Зарплата", range: "A3:F5002" },
         { key: "otherIncome", name: "Излишки/потери", range: "A4:I1000" },
-        { key: "bankCash", name: "Деньги р/с", range: "A4:J5029" },
-        { key: "cashBox", name: "Касса", range: "A4:G128" }
+        { key: "bankCash", name: "Деньги р/с", range: "A4:J5029", balanceKey: "bankCash" },
+        { key: "cashBox", name: "Касса", range: "A4:G128", balanceKey: "cashBox" },
+        { key: "ppe", name: "Основное средство", range: "A3:J168", balanceKey: "ppe" },
+        { key: "inventoryTrade", name: "ТМЗ", range: "A4:AG10000", balanceKey: "inventoryTrade" },
+        { key: "inventoryProduction", name: "ТМЗ (производство)", range: "A4:AD1000", balanceKey: "inventoryProduction" },
+        { key: "waste", name: "Деловые отходы", range: "A4:Y1000", balanceKey: "waste" },
+        { key: "wasteAccounting", name: "Учёт деловых отходов", range: "A3:O2000", balanceKey: "wasteAccounting" },
+        { key: "scrap", name: "Лом", range: "A4:T1000", balanceKey: "scrap" },
+        { key: "debtorRegister", name: "Единый реестр дебиторов", range: "A2:D20000", balanceKey: "debtorRegister" },
+        { key: "creditorRegister", name: "Единый реестр кредиторов", range: "A3:C20000", balanceKey: "creditorRegister" },
+        { key: "equity", name: "Собственный капитал", range: "A4:G1000", balanceKey: "equity" },
+        { key: "loans", name: "Долгсрочный займ", range: "A4:K1000", balanceKey: "loans" },
+        { key: "relatedSherzod", name: "Выплаты Шерзод Миркомилов", range: "A4:H152", balanceKey: "relatedSherzod" },
+        { key: "relatedKichkina", name: "Выплаты Кичкина", range: "A4:H1000", balanceKey: "relatedKichkina" },
+        { key: "insightInventoryFinal", name: "Склад Insight", range: "I2:I2", balanceKey: "insightInventoryFinal" },
+        { key: "currentBalance", name: "Текущий баланс", range: "F12:F12", balanceKey: "currentBalance" },
+        ...(balanceReportSheetName
+          ? [{ key: "balanceReportDates", name: balanceReportSheetName, range: "B1:B2", balanceKey: "balanceReportDates" }]
+          : [])
       ];
       const targetSheets = sheetConfigs.map(({ name }) => name);
       
@@ -221,12 +256,45 @@ export default function App() {
       const rate = Number(exchangeRate) || 12800;
       let consolidatedTx = [];
       let txIdCounter = 1;
+      const balanceRows = {};
+      const normalizeSourceDate = (val) => {
+        if (val === undefined || val === null || val === "") return "";
+        const raw = val.toString().trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        const serial = Number(raw);
+        if (Number.isFinite(serial) && serial > 20000 && serial < 80000) {
+          const date = new Date(Date.UTC(1899, 11, 30 + Math.floor(serial)));
+          return date.toISOString().slice(0, 10);
+        }
+        let match = raw.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+        if (match) {
+          const [, y, m, d] = match;
+          return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+        }
+        match = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+        if (match) {
+          const [, d, m, yRaw] = match;
+          const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+          return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+        }
+        return "";
+      };
+      const parseSourceAmount = (val) => {
+        if (typeof val === "number" && Number.isFinite(val)) return val;
+        if (val === undefined || val === null || val === "") return 0;
+        const normalized = val.toString().replace(/\s/g, "").replace(",", ".").replace(/[^\d.-]/g, "");
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : 0;
+      };
 
       // Map sheet data by sheet name
       data.valueRanges.forEach((vr) => {
         const rangeStr = vr.range || "";
         const config = sheetConfigs.find(({ name }) => rangeStr.includes(name));
         const matchName = config?.name || targetSheets.find(s => rangeStr.includes(s));
+        if (config?.balanceKey) {
+          balanceRows[config.balanceKey] = vr.values || [];
+        }
         if (!matchName || !vr.values || vr.values.length === 0) {
           console.warn(`Пропущен или пуст лист: ${rangeStr}`);
           return;
@@ -883,6 +951,14 @@ export default function App() {
       }
 
       setTransactions(consolidatedTx);
+      setBalanceSourceData({
+        mode: "formula",
+        rows: balanceRows,
+        insightInventoryFinal: parseSourceAmount(balanceRows.insightInventoryFinal?.[0]?.[0]),
+        registerStartDate: normalizeSourceDate(balanceRows.currentBalance?.[0]?.[0]),
+        reportStartDate: normalizeSourceDate(balanceRows.balanceReportDates?.[0]?.[0]),
+        reportEndDate: normalizeSourceDate(balanceRows.balanceReportDates?.[1]?.[0])
+      });
       setSelectedSheet("Все листы (Консолидировано)");
       setSourceName(`Google Sheets (Консолидация PnL + Cash Flow)`);
       localStorage.setItem("gs_sheet_name", "Все листы (Консолидировано)");
@@ -972,6 +1048,7 @@ export default function App() {
       }
 
       setTransactions(parsedTransactions);
+      setBalanceSourceData(null);
       setSelectedSheet(targetSheetName);
       setSourceName(`Google Sheets (Лист: ${targetSheetName})`);
       localStorage.setItem("gs_sheet_name", targetSheetName);
@@ -1208,7 +1285,7 @@ export default function App() {
           )}
 
           {activeTab === "balance" && (
-            <BalanceSheet transactions={transactions} />
+            <BalanceSheet transactions={transactions} balanceSourceData={balanceSourceData} />
           )}
 
           {activeTab === "reconciliation" && (
