@@ -142,6 +142,12 @@ export default function App() {
     }
   }, [transactions]);
 
+  useEffect(() => {
+    if (HAS_HOSTED_GOOGLE_CONFIG && activeTab === "import") {
+      setActiveTab("overview");
+    }
+  }, [activeTab]);
+
   const loadMockData = () => {
     // Process initial mock transactions and auto-convert if enabled
     const baseTx = getTransactions();
@@ -1237,16 +1243,17 @@ export default function App() {
 
         </nav>
 
-        {/* BOTTOM INTEGRATION SETTINGS */}
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
-          <button
-            className={`btn btn-secondary ${activeTab === "import" ? "btn-primary" : ""}`}
-            style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "import" ? "var(--primary)" : "transparent" }}
-            onClick={() => setActiveTab("import")}
-          >
-            ⚙️ Подключение Sheets
-          </button>
-        </div>
+        {!HAS_HOSTED_GOOGLE_CONFIG && (
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+            <button
+              className={`btn btn-secondary ${activeTab === "import" ? "btn-primary" : ""}`}
+              style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "import" ? "var(--primary)" : "transparent" }}
+              onClick={() => setActiveTab("import")}
+            >
+              ⚙️ Подключение Sheets
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* RIGHT CONTENT WORKSPACE */}
@@ -1356,7 +1363,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "import" && (
+          {!HAS_HOSTED_GOOGLE_CONFIG && activeTab === "import" && (
             <DataImporter 
               onDataLoaded={handleDataLoaded} 
               currentSource={sourceName} 
