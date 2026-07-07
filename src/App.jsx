@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { getTransactions } from "./mockData";
-import { runAudits } from "./financialCalculations";
 import DashboardOverview from "./components/DashboardOverview";
 import PnLReport from "./components/PnLReport";
 import CashFlowReport from "./components/CashFlowReport";
@@ -81,7 +80,6 @@ export default function App() {
   const [balanceSourceData, setBalanceSourceData] = useState(null);
   const [sourceName, setSourceName] = useState("Демо-данные (Mock Data)");
   const [activeTab, setActiveTab] = useState("overview");
-  const [audits, setAudits] = useState({ warnings: [], errors: [], total: 0 });
 
   // Google Sheets Metadata States
   const [sheetMetadata, setSheetMetadata] = useState([]);
@@ -128,13 +126,6 @@ export default function App() {
       loadMockData();
     }
   }, []);
-
-  // Update audits whenever transactions change
-  useEffect(() => {
-    if (transactions.length > 0) {
-      setAudits(runAudits(transactions));
-    }
-  }, [transactions]);
 
   useEffect(() => {
     if (HAS_HOSTED_GOOGLE_CONFIG && activeTab === "import") {
@@ -1254,7 +1245,6 @@ export default function App() {
           {activeTab === "overview" && (
             <DashboardOverview 
               transactions={transactions} 
-              audits={audits}
             />
           )}
 

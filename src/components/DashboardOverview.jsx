@@ -1,7 +1,7 @@
 import React from "react";
 import { formatCurrency, getMonthsList, getMonthNameRU, calculatePnL, calculateCashFlow } from "../financialCalculations";
 
-export default function DashboardOverview({ transactions, audits }) {
+export default function DashboardOverview({ transactions }) {
   const months = getMonthsList(transactions);
   
   // Calculate Totals
@@ -337,46 +337,6 @@ export default function DashboardOverview({ transactions, audits }) {
                 );
               })}
             </div>
-          </div>
-
-          {/* Audit Highlights */}
-          <div className="card" style={{ border: audits.errors.length > 0 ? "1px solid rgba(244, 63, 94, 0.3)" : "1px solid var(--border)" }}>
-            <h3 style={{ fontSize: "16px", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span>Аудит базы данных</span>
-              <span className={`badge ${audits.errors.length > 0 ? 'badge-error' : audits.warnings.length > 0 ? 'badge-warning' : 'badge-success'}`}>
-                {audits.total} сообщений
-              </span>
-            </h3>
-
-            {audits.total > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {audits.errors.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", padding: "10px", backgroundColor: "rgba(244, 63, 94, 0.08)", borderRadius: "8px", borderLeft: "3px solid var(--error)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--error)" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    <span>Критические ошибки: <strong>{audits.errors.length}</strong>. Баланс уходит в минус!</span>
-                  </div>
-                )}
-                
-                {audits.warnings.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", padding: "10px", backgroundColor: "rgba(245, 158, 11, 0.08)", borderRadius: "8px", borderLeft: "3px solid var(--warning)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <span>Предупреждения: <strong>{audits.warnings.length}</strong> (дубликаты, пропуски категорий).</span>
-                  </div>
-                )}
-
-              </div>
-            ) : (
-              <p style={{ color: "var(--success)", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                База данных Google Sheets проверена. Ошибок не обнаружено!
-              </p>
-            )}
           </div>
 
         </div>
