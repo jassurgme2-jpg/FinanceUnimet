@@ -7,7 +7,6 @@ export default function DashboardOverview({ transactions, audits }) {
   // Calculate Totals
   let totalRevenue = 0;
   let totalExpenses = 0;
-  let totalCash = 0;
 
   // Process data using calculations helpers
   const pnlData = calculatePnL(transactions, months);
@@ -66,10 +65,15 @@ export default function DashboardOverview({ transactions, audits }) {
   });
 
   // SVG Chart Preparation
-  const chartHeight = 180;
-  const chartWidth = 500;
-  const maxMonthValue = Math.max(
-    ...months.map(m => {
+  const chartWidth = 960;
+  const chartHeight = 520;
+  const chartTop = 44;
+  const chartRight = 28;
+  const chartBottom = 92;
+  const chartLeft = 82;
+  const plotWidth = chartWidth - chartLeft - chartRight;
+  const plotHeight = chartHeight - chartTop - chartBottom;
+  const chartData = months.map(m => {
       let rev = 0;
       let exp = 0;
       if (pnlData.revenue) {
@@ -90,11 +94,22 @@ export default function DashboardOverview({ transactions, audits }) {
           Object.values(group).forEach(cat => exp += cat[m] || 0);
         }
       });
-      
-      return Math.max(rev, exp);
-    }),
-    1 // fallback
-  );
+
+      return {
+        month: m,
+        label: getMonthNameRU(m).split(" ")[0],
+        year: m.substring(0, 4),
+        revenue: rev,
+        expenses: exp
+      };
+    });
+  const maxMonthValue = Math.max(...chartData.map(item => Math.max(item.revenue, item.expenses)), 1);
+  const axisMax = Math.max(1, Math.ceil(maxMonthValue / 100000) * 100000);
+  const formatAxisValue = (value) => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
+    if (value >= 1000) return `${Math.round(value / 1000)}k`;
+    return `${Math.round(value)}`;
+  };
 
   return (
     <div className="animate-fade-in dashboard-page" style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
@@ -163,90 +178,90 @@ export default function DashboardOverview({ transactions, audits }) {
       </div>
 
       {/* Grid: Charts & Audits */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "32px", alignItems: "start" }}>
         
         {/* Left: Financial Chart (SVG) */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: "22px", padding: "28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap" }}>
             <div>
-              <h3 style={{ fontSize: "18px" }}>Динамика доходов и расходов</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: "12px" }}>Ежемесячное сравнение выручки и затрат</p>
+              <h3 style={{ fontSize: "22px", textWrap: "balance" }}>Динамика доходов и расходов</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "4px", textWrap: "pretty" }}>
+                Ежемесячное сравнение выручки и затрат по данным Google Sheets.
+              </p>
             </div>
-            <div style={{ display: "flex", gap: "16px", fontSize: "12px" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "3px", backgroundColor: "var(--primary)" }}></span>
+            <div style={{ display: "flex", gap: "14px", fontSize: "12px", flexWrap: "wrap", paddingTop: "4px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "7px", color: "var(--text-primary)", fontWeight: 700 }}>
+                <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "4px", backgroundColor: "var(--primary)", boxShadow: "0 0 14px rgba(var(--primary-rgb), 0.35)" }}></span>
                 Выручка
               </span>
-              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "3px", backgroundColor: "var(--error)" }}></span>
+              <span style={{ display: "flex", alignItems: "center", gap: "7px", color: "var(--text-primary)", fontWeight: 700 }}>
+                <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "4px", backgroundColor: "var(--error)", boxShadow: "0 0 14px rgba(var(--error-rgb), 0.28)" }}></span>
                 Расходы
               </span>
             </div>
           </div>
 
-          <div style={{ position: "relative", width: "100%", height: `${chartHeight + 40}px` }}>
-            <svg viewBox={`0 0 ${chartWidth} ${chartHeight + 40}`} width="100%" height="100%">
+          <div style={{
+            position: "relative",
+            width: "100%",
+            height: "clamp(320px, 34vw, 390px)",
+            padding: "12px",
+            borderRadius: "14px",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))",
+            border: "1px solid rgba(255,255,255,0.06)"
+          }}>
+            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#60a5fa" />
+                  <stop offset="100%" stopColor="#2563eb" />
+                </linearGradient>
+                <linearGradient id="expenseBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#fb7185" />
+                  <stop offset="100%" stopColor="#e11d48" />
+                </linearGradient>
+              </defs>
+
               {/* Horizontal grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
-                const y = chartHeight - (ratio * chartHeight) + 15;
+              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                const y = chartTop + plotHeight - (ratio * plotHeight);
+                const axisValue = axisMax * ratio;
                 return (
-                  <g key={idx}>
-                    <line x1="40" y1={y} x2={chartWidth - 10} y2={y} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
-                    <text x="5" y={y + 4} fill="var(--text-muted)" fontSize="10" textAnchor="start">
-                      {Math.round((maxMonthValue * ratio) / 1000)}k
+                  <g key={ratio}>
+                    <line x1={chartLeft} y1={y} x2={chartWidth - chartRight} y2={y} stroke="rgba(255,255,255,0.075)" strokeWidth="1" strokeDasharray="6 8" />
+                    <text x={chartLeft - 14} y={y + 4} fill="var(--text-muted)" fontSize="14" textAnchor="end" fontVariant="tabular-nums">
+                      {formatAxisValue(axisValue)}
                     </text>
                   </g>
                 );
               })}
 
               {/* Draw Bar groups for each month */}
-              {months.map((m, idx) => {
-                const groupWidth = (chartWidth - 50) / months.length;
-                const groupX = 40 + idx * groupWidth;
-                
-                // Get month calculations
-                let income = 0;
-                let expense = 0;
-                if (pnlData.revenue) {
-                  Object.values(pnlData.revenue).forEach(cat => income += cat[m] || 0);
-                }
-                
-                const expenseGroups = [
-                  pnlData.cogs,
-                  pnlData.distribution,
-                  pnlData.admin,
-                  pnlData.otherTax,
-                  pnlData.finance,
-                  pnlData.incomeTax
-                ];
-                
-                expenseGroups.forEach(group => {
-                  if (group) {
-                    Object.values(group).forEach(cat => expense += cat[m] || 0);
-                  }
-                });
-
-                const incHeight = (income / maxMonthValue) * chartHeight;
-                const expHeight = (expense / maxMonthValue) * chartHeight;
-
-                const barWidth = Math.min(18, groupWidth * 0.35);
-                const gap = 4;
+              {chartData.map((item, idx) => {
+                const groupWidth = plotWidth / Math.max(chartData.length, 1);
+                const groupX = chartLeft + idx * groupWidth;
+                const incHeight = (item.revenue / axisMax) * plotHeight;
+                const expHeight = (item.expenses / axisMax) * plotHeight;
+                const barWidth = Math.max(8, Math.min(24, groupWidth * 0.28));
+                const gap = Math.max(4, Math.min(8, groupWidth * 0.08));
                 const incX = groupX + (groupWidth - (barWidth * 2 + gap)) / 2;
                 const expX = incX + barWidth + gap;
-
-                const incY = chartHeight - incHeight + 15;
-                const expY = chartHeight - expHeight + 15;
+                const baseY = chartTop + plotHeight;
+                const incY = baseY - incHeight;
+                const expY = baseY - expHeight;
+                const showMonthLabel = chartData.length <= 18 || idx % 2 === 0;
+                const showYearLabel = idx === 0 || item.year !== chartData[idx - 1]?.year;
 
                 return (
-                  <g key={m}>
+                  <g key={item.month}>
                     {/* Income Bar */}
                     <rect
                       x={incX}
                       y={incY}
                       width={barWidth}
                       height={incHeight}
-                      fill="var(--primary)"
-                      rx="3"
+                      fill="url(#revenueBarGradient)"
+                      rx="5"
                       opacity="0.95"
                     />
                     {/* Expense Bar */}
@@ -255,26 +270,40 @@ export default function DashboardOverview({ transactions, audits }) {
                       y={expY}
                       width={barWidth}
                       height={expHeight}
-                      fill="var(--error)"
-                      rx="3"
+                      fill="url(#expenseBarGradient)"
+                      rx="5"
                       opacity="0.95"
                     />
                     {/* Month Label */}
-                    <text
-                      x={groupX + groupWidth / 2}
-                      y={chartHeight + 32}
-                      fill="var(--text-secondary)"
-                      fontSize="10"
-                      textAnchor="middle"
-                    >
-                      {getMonthNameRU(m).split(" ")[0]}
-                    </text>
+                    {showMonthLabel && (
+                      <text
+                        x={groupX + groupWidth / 2}
+                        y={baseY + 24}
+                        fill="var(--text-secondary)"
+                        fontSize="12"
+                        textAnchor="middle"
+                      >
+                        {item.label}
+                      </text>
+                    )}
+                    {showYearLabel && (
+                      <text
+                        x={groupX + groupWidth / 2}
+                        y={baseY + 46}
+                        fill="var(--text-muted)"
+                        fontSize="12"
+                        fontWeight="700"
+                        textAnchor="middle"
+                      >
+                        {item.year}
+                      </text>
+                    )}
                   </g>
                 );
               })}
               
               {/* Bottom axis line */}
-              <line x1="40" y1={chartHeight + 15} x2={chartWidth - 10} y2={chartHeight + 15} stroke="var(--border)" strokeWidth="1" />
+              <line x1={chartLeft} y1={chartTop + plotHeight} x2={chartWidth - chartRight} y2={chartTop + plotHeight} stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
             </svg>
           </div>
         </div>
