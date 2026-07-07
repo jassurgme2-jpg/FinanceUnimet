@@ -1121,7 +1121,7 @@ export default function App() {
     <div className="app-container">
       {/* LEFT SIDEBAR NAVIGATION */}
       <aside className="sidebar">
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "36px", paddingLeft: "8px" }}>
+        <div className="sidebar-brand" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "36px", paddingLeft: "8px" }}>
           <div style={{
             width: "32px",
             height: "32px",
@@ -1147,7 +1147,7 @@ export default function App() {
         </div>
 
         {/* NAV ITEMS */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: "6px", flexGrow: 1 }}>
+        <nav className="sidebar-nav" style={{ display: "flex", flexDirection: "column", gap: "6px", flexGrow: 1 }}>
           
           <button
             className={`btn btn-secondary ${activeTab === "overview" ? "btn-primary" : ""}`}
@@ -1267,7 +1267,7 @@ export default function App() {
         
         {/* HEADER */}
         <header className="header">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="header-source" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{
               width: "8px",
               height: "8px",
@@ -1280,7 +1280,7 @@ export default function App() {
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div className="header-actions" style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <span style={{ fontSize: "12px", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
               Загружено транзакций: <strong style={{ color: "white" }}>{transactions.length}</strong>
             </span>

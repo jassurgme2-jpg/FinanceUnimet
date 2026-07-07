@@ -66,7 +66,7 @@ export default function CashFlowReport({ transactions }) {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="animate-fade-in report-page cashflow-report-page" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
           <div>
@@ -120,8 +120,8 @@ export default function CashFlowReport({ transactions }) {
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="table-container">
-          <table className="fin-table">
+        <div className="table-container report-table-container">
+          <table className="fin-table cashflow-table">
             <thead>
               <tr>
                 <th style={{ width: "56px", textAlign: "center" }}>№</th>

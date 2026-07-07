@@ -90,7 +90,7 @@ export default function BalanceSheet({ transactions, balanceSourceData }) {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+    <div className="animate-fade-in report-page balance-report-page" style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
       {/* Overview stats */}
       <div style={{
         display: "grid",

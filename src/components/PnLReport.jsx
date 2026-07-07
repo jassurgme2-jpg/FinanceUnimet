@@ -366,7 +366,7 @@ export default function PnLReport({ transactions }) {
   const pnlTableMinWidth = `${Math.max(980, 260 + 80 + periods.length * 118 + 130 + 90)}px`;
 
   return (
-    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="animate-fade-in report-page pnl-report-page" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       
       {/* FILTER PANEL */}
       <div className="card" style={{
@@ -662,15 +662,15 @@ export default function PnLReport({ transactions }) {
       </div>
 
       {/* P&L TABLE CARD */}
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="card report-table-card" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="report-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h2 style={{ fontSize: "22px" }}>Отчет о прибылях и убытках (PnL)</h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "4px" }}>
               Построен в соответствии с алгоритмом расчета ваших Google таблиц. Отображает доходы, расходы и прибыль по периодам.
             </p>
           </div>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div className="report-actions" style={{ display: "flex", gap: "10px" }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => setExpanded({
@@ -700,8 +700,8 @@ export default function PnLReport({ transactions }) {
             <p style={{ fontSize: "14px", marginTop: "8px" }}>Попробуйте изменить параметры фильтра дат.</p>
           </div>
         ) : (
-          <div className="table-container">
-            <table className="fin-table" style={{ minWidth: pnlTableMinWidth }}>
+          <div className="table-container report-table-container">
+            <table className="fin-table pnl-table" style={{ minWidth: pnlTableMinWidth }}>
               <thead>
                 <tr>
                   <th style={{ width: "260px" }}>Финансовая статья</th>

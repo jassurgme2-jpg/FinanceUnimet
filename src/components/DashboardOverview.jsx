@@ -97,7 +97,7 @@ export default function DashboardOverview({ transactions, audits, onNavigateToTa
   );
 
   return (
-    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+    <div className="animate-fade-in dashboard-page" style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
       {/* 4 KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "24px" }}>
         
