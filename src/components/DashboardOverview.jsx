@@ -1,5 +1,5 @@
 import React from "react";
-import { formatCurrency, getMonthsList, getMonthNameRU, calculatePnL, calculateCashFlow } from "../financialCalculations";
+import { formatCurrency, getCategoryType, getMonthsList, getMonthNameRU, calculatePnL, calculateCashFlow } from "../financialCalculations";
 
 export default function DashboardOverview({ transactions }) {
   const months = getMonthsList(transactions);
@@ -41,28 +41,50 @@ export default function DashboardOverview({ transactions }) {
   const netProfit = totalRevenue - totalExpenses;
   const currentCash = cfData.monthlyBalances[months[months.length - 1]] || cfData.initialTotal;
 
-  // Calculate Account Balances for distribution
-  const accountBalances = {};
-  // Start with initial balances from our mock model or fallback to 0
-  const initialAccounts = {
-    "Р/С Альфа-Банк": 1200000,
-    "Р/С Сбербанк": 850000,
-    "Касса Офис": 50000
+  const grossProfitSegments = [
+    { key: "trade", label: "Торговля", color: "var(--primary)", glow: "rgba(var(--primary-rgb), 0.3)", revenue: 0, cogs: 0, gross: 0 },
+    { key: "production", label: "Производство", color: "var(--success)", glow: "rgba(var(--success-rgb), 0.28)", revenue: 0, cogs: 0, gross: 0 },
+    { key: "plasma", label: "Плазморез", color: "var(--info)", glow: "rgba(var(--info-rgb), 0.3)", revenue: 0, cogs: 0, gross: 0 },
+    { key: "cashback", label: "Кешбек", color: "var(--warning)", glow: "rgba(var(--warning-rgb), 0.28)", revenue: 0, cogs: 0, gross: 0 }
+  ];
+  const grossProfitBySegment = new Map(grossProfitSegments.map((segment) => [segment.key, { ...segment }]));
+  const getGrossProfitSegmentKey = (tx) => {
+    const haystack = `${tx.account || ""} ${tx.category || ""} ${tx.description || ""}`.toLowerCase();
+    if (/кешбек|кешбэк|cashback/.test(haystack)) return "cashback";
+    if (/плазморез|плазм|plasma/.test(haystack)) return "plasma";
+    if (/производ|production/.test(haystack)) return "production";
+    if (/торгов|trade/.test(haystack)) return "trade";
+    return "";
   };
-  
-  // Process real account names in transactions
+
   transactions.forEach((tx) => {
-    const acc = tx.account || "Не указан";
-    if (!accountBalances[acc]) {
-      accountBalances[acc] = initialAccounts[acc] || 0;
+    const segmentKey = getGrossProfitSegmentKey(tx);
+    if (!segmentKey) return;
+
+    const segment = grossProfitBySegment.get(segmentKey);
+    const amount = Number(tx.amount || 0);
+    if (!Number.isFinite(amount) || amount === 0) return;
+
+    const pnlType = tx.pnlGroup || getCategoryType(tx.category);
+    if (segmentKey === "cashback") {
+      if (pnlType === "otherIncome" || /кешбек|кешбэк|cashback/i.test(tx.category || "")) {
+        segment.revenue += tx.type === "Expense" ? -Math.abs(amount) : amount;
+      }
+      return;
     }
-    const amt = Number(tx.amount || 0);
-    if (tx.type === "Income") {
-      accountBalances[acc] += amt;
-    } else {
-      accountBalances[acc] -= amt;
+
+    if (pnlType === "revenue") {
+      segment.revenue += amount;
+    }
+    if (pnlType === "cogs") {
+      segment.cogs += amount;
     }
   });
+  const grossProfitRows = Array.from(grossProfitBySegment.values()).map((segment) => ({
+    ...segment,
+    gross: segment.revenue - segment.cogs
+  }));
+  const maxGrossProfit = Math.max(...grossProfitRows.map((segment) => Math.abs(segment.gross)), 1);
 
   // SVG Chart Preparation
   const chartWidth = 960;
@@ -311,27 +333,51 @@ export default function DashboardOverview({ transactions }) {
         {/* Right: Balances & Alerts Summary */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           
-          {/* Account Balances */}
+          {/* Gross Profit by direction */}
           <div className="card">
-            <h3 style={{ fontSize: "16px", marginBottom: "16px" }}>Распределение по счетам</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {Object.entries(accountBalances).map(([acc, balance]) => {
-                const total = Object.values(accountBalances).reduce((a, b) => a + b, 0);
-                const pct = Math.max(0, Math.round((balance / (total || 1)) * 100));
-                
+            <div style={{ marginBottom: "18px" }}>
+              <h3 style={{ fontSize: "18px", textWrap: "balance" }}>Валовая прибыль</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "12px", marginTop: "4px", textWrap: "pretty" }}>
+                По ключевым направлениям бизнеса.
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {grossProfitRows.map((segment, idx) => {
+                const widthPct = Math.max(3, Math.round((Math.abs(segment.gross) / maxGrossProfit) * 100));
+
                 return (
-                  <div key={acc} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                      <span style={{ color: "var(--text-primary)", fontWeight: "500" }}>{acc}</span>
-                      <span style={{ fontWeight: "600" }}>{formatCurrency(balance)}</span>
+                  <div key={segment.key} style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px", fontSize: "13px" }}>
+                      <span style={{ color: "var(--text-primary)", fontWeight: "700" }}>
+                        {idx + 1}. {segment.label}
+                      </span>
+                      <span style={{
+                        color: segment.gross < 0 ? "var(--error)" : "white",
+                        fontWeight: "800",
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap"
+                      }}>
+                        {formatCurrency(segment.gross)}
+                      </span>
                     </div>
-                    <div style={{ height: "6px", width: "100%", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{
+                      height: "7px",
+                      width: "100%",
+                      backgroundColor: "rgba(255,255,255,0.055)",
+                      borderRadius: "999px",
+                      overflow: "hidden"
+                    }}>
                       <div style={{
                         height: "100%",
-                        width: `${pct}%`,
-                        backgroundColor: balance < 0 ? "var(--error)" : acc.includes("Альфа") ? "var(--primary)" : acc.includes("Сбер") ? "var(--success)" : "var(--warning)",
-                        borderRadius: "3px"
+                        width: `${widthPct}%`,
+                        backgroundColor: segment.gross < 0 ? "var(--error)" : segment.color,
+                        borderRadius: "999px",
+                        boxShadow: `0 0 16px ${segment.gross < 0 ? "rgba(var(--error-rgb), 0.35)" : segment.glow}`
                       }}></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", color: "var(--text-muted)", fontSize: "11px", fontVariantNumeric: "tabular-nums" }}>
+                      <span>Выручка: {formatCurrency(segment.revenue)}</span>
+                      {segment.key !== "cashback" && <span>Себестоимость: {formatCurrency(segment.cogs)}</span>}
                     </div>
                   </div>
                 );
