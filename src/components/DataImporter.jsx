@@ -1,8 +1,18 @@
 import React, { useState } from "react";
+import {
+  DEFAULT_APPS_SCRIPT_TOKEN,
+  DEFAULT_APPS_SCRIPT_URL,
+  DEFAULT_AUTO_CONVERT,
+  DEFAULT_EXCHANGE_RATE,
+  DEFAULT_GOOGLE_API_KEY,
+  DEFAULT_GOOGLE_SHEET_ID,
+  HAS_HOSTED_GOOGLE_CONFIG
+} from "../config";
 
 export default function DataImporter({ onDataLoaded, currentSource, onLoadMockData, loadConsolidatedData }) {
-  const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || "");
-  const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || "");
+  const storedAutoConvert = localStorage.getItem("gs_auto_convert");
+  const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID);
+  const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY);
   const [availableSheets, setAvailableSheets] = useState([]);
   const [selectedSheet, setSelectedSheet] = useState(localStorage.getItem("gs_sheet_name") || "");
   const [loading, setLoading] = useState(false);
@@ -10,10 +20,10 @@ export default function DataImporter({ onDataLoaded, currentSource, onLoadMockDa
   const [dragActive, setDragActive] = useState(false);
 
   // Apps Script API Config States
-  const [appsScriptUrl, setAppsScriptUrl] = useState(localStorage.getItem("gs_apps_script_url") || "");
-  const [appsScriptToken, setAppsScriptToken] = useState(localStorage.getItem("gs_apps_script_token") || "my_secret_token_123");
-  const [exchangeRate, setExchangeRate] = useState(localStorage.getItem("gs_exchange_rate") || "12800");
-  const [autoConvert, setAutoConvert] = useState(localStorage.getItem("gs_auto_convert") !== "false");
+  const [appsScriptUrl, setAppsScriptUrl] = useState(localStorage.getItem("gs_apps_script_url") || DEFAULT_APPS_SCRIPT_URL);
+  const [appsScriptToken, setAppsScriptToken] = useState(localStorage.getItem("gs_apps_script_token") || DEFAULT_APPS_SCRIPT_TOKEN);
+  const [exchangeRate, setExchangeRate] = useState(localStorage.getItem("gs_exchange_rate") || DEFAULT_EXCHANGE_RATE);
+  const [autoConvert, setAutoConvert] = useState(storedAutoConvert === null ? DEFAULT_AUTO_CONVERT : storedAutoConvert !== "false");
 
   const loadDataForSheet = async (cleanSheetId, targetSheetName, titlesList = []) => {
     setLoading(true);
@@ -310,6 +320,11 @@ export default function DataImporter({ onDataLoaded, currentSource, onLoadMockDa
         <p style={{ color: "var(--text-secondary)", fontSize: "14px", lineHeight: "1.5" }}>
           Укажите ID вашей Google таблицы и API-ключи. Настройте URL-скрипта Apps Script для автоматической записи новых операций и бюджетов.
         </p>
+        {HAS_HOSTED_GOOGLE_CONFIG && (
+          <div className="badge badge-success" style={{ padding: "12px", borderRadius: "8px", display: "block", textAlign: "left", lineHeight: "1.4" }}>
+            Автоподключение включено: база Google Sheets уже задана в конфиге веб-версии.
+          </div>
+        )}
 
         {error && (
           <div className="badge badge-error" style={{ padding: "12px", borderRadius: "8px", display: "block", textAlign: "left", lineHeight: "1.4" }}>

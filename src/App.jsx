@@ -12,6 +12,15 @@ import DataImporter from "./components/DataImporter";
 import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
 import TransactionManager from "./components/TransactionManager";
 import BudgetGoalManager from "./components/BudgetGoalManager";
+import {
+  DEFAULT_APPS_SCRIPT_TOKEN,
+  DEFAULT_APPS_SCRIPT_URL,
+  DEFAULT_AUTO_CONVERT,
+  DEFAULT_EXCHANGE_RATE,
+  DEFAULT_GOOGLE_API_KEY,
+  DEFAULT_GOOGLE_SHEET_ID,
+  HAS_HOSTED_GOOGLE_CONFIG
+} from "./config";
 
 const FORMULA_PNL_GROUP_BY_CATEGORY = new Map([
   ["Выручка, нетто без НДС", "revenue"],
@@ -71,6 +80,7 @@ const getFormulaPnLGroup = (category) => {
 };
 
 export default function App() {
+  const storedAutoConvert = localStorage.getItem("gs_auto_convert");
   const [transactions, setTransactions] = useState([]);
   const [balanceSourceData, setBalanceSourceData] = useState(null);
   const [sourceName, setSourceName] = useState("Демо-данные (Mock Data)");
@@ -80,24 +90,29 @@ export default function App() {
   // Google Sheets Metadata States
   const [sheetMetadata, setSheetMetadata] = useState([]);
   const [selectedSheet, setSelectedSheet] = useState(localStorage.getItem("gs_sheet_name") || "");
-  const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || "");
-  const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || "");
+  const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID);
+  const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY);
 
   // Apps Script & Conversion States
-  const [appsScriptUrl, setAppsScriptUrl] = useState(localStorage.getItem("gs_apps_script_url") || "");
-  const [appsScriptToken, setAppsScriptToken] = useState(localStorage.getItem("gs_apps_script_token") || "my_secret_token_123");
-  const [exchangeRate, setExchangeRate] = useState(localStorage.getItem("gs_exchange_rate") || "12800");
-  const [autoConvert, setAutoConvert] = useState(localStorage.getItem("gs_auto_convert") !== "false");
+  const [appsScriptUrl, setAppsScriptUrl] = useState(localStorage.getItem("gs_apps_script_url") || DEFAULT_APPS_SCRIPT_URL);
+  const [appsScriptToken, setAppsScriptToken] = useState(localStorage.getItem("gs_apps_script_token") || DEFAULT_APPS_SCRIPT_TOKEN);
+  const [exchangeRate, setExchangeRate] = useState(localStorage.getItem("gs_exchange_rate") || DEFAULT_EXCHANGE_RATE);
+  const [autoConvert, setAutoConvert] = useState(storedAutoConvert === null ? DEFAULT_AUTO_CONVERT : storedAutoConvert !== "false");
 
   // Load spreadsheet metadata and data if saved in localStorage
   useEffect(() => {
-    const savedId = localStorage.getItem("gs_sheet_id");
-    const savedKey = localStorage.getItem("gs_api_key");
+    const savedId = localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID;
+    const savedKey = localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY;
 
     if (savedId && savedKey) {
       setSheetId(savedId);
       setApiKey(savedKey);
       setSelectedSheet("Все листы (Консолидировано)");
+      if (HAS_HOSTED_GOOGLE_CONFIG) {
+        localStorage.setItem("gs_sheet_id", savedId);
+        localStorage.setItem("gs_api_key", savedKey);
+        localStorage.setItem("gs_sheet_name", "Все листы (Консолидировано)");
+      }
 
       // Silently fetch sheets metadata
       fetch(`https://sheets.googleapis.com/v4/spreadsheets/${savedId}?key=${savedKey}`)
@@ -1059,6 +1074,37 @@ export default function App() {
     }
   };
 
+  const refreshDefaultData = async () => {
+    const defaultSheetId = sheetId || localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID;
+    const defaultApiKey = apiKey || localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY;
+
+    if (!defaultSheetId || !defaultApiKey) {
+      loadMockData();
+      return;
+    }
+
+    setSheetId(defaultSheetId);
+    setApiKey(defaultApiKey);
+    setSelectedSheet("Все листы (Консолидировано)");
+    localStorage.setItem("gs_sheet_id", defaultSheetId);
+    localStorage.setItem("gs_api_key", defaultApiKey);
+    localStorage.setItem("gs_sheet_name", "Все листы (Консолидировано)");
+
+    try {
+      const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${defaultSheetId}?key=${defaultApiKey}`;
+      const metadataRes = await fetch(metadataUrl);
+      if (metadataRes.ok) {
+        const metadata = await metadataRes.json();
+        if (metadata.sheets) setSheetMetadata(metadata.sheets);
+      }
+    } catch (err) {
+      console.warn("Не удалось обновить metadata Google Sheets:", err);
+    }
+
+    const success = await loadConsolidatedData(defaultSheetId, defaultApiKey);
+    if (!success) loadMockData();
+  };
+
   return (
     <div className="app-container">
       {/* LEFT SIDEBAR NAVIGATION */}
@@ -1225,8 +1271,8 @@ export default function App() {
             <span style={{ fontSize: "12px", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
               Загружено транзакций: <strong style={{ color: "white" }}>{transactions.length}</strong>
             </span>
-            <button className="btn btn-secondary" style={{ padding: "8px 12px", fontSize: "12px" }} onClick={loadMockData}>
-              🔄 Сбросить данные
+            <button className="btn btn-secondary" style={{ padding: "8px 12px", fontSize: "12px" }} onClick={refreshDefaultData}>
+              🔄 {sheetId && apiKey ? "Обновить базу" : "Сбросить данные"}
             </button>
           </div>
         </header>
@@ -1314,7 +1360,7 @@ export default function App() {
             <DataImporter 
               onDataLoaded={handleDataLoaded} 
               currentSource={sourceName} 
-              onLoadMockData={loadMockData}
+              onLoadMockData={refreshDefaultData}
               loadConsolidatedData={loadConsolidatedData}
             />
           )}

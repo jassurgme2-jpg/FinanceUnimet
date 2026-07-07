@@ -1,16 +1,45 @@
-# React + Vite
+# FinanceFlow Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Автоподключение Google Sheets
 
-Currently, two official plugins are available:
+Чтобы пользователи открывали веб-ссылку уже с подключенной базой, задайте конфиг при сборке:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Скопируйте `.env.example` в `.env.local`.
+2. Вставьте ваш Google Sheets API key в `VITE_GOOGLE_API_KEY`.
+3. Запустите `npm run build` и задеплойте `dist`.
 
-## React Compiler
+Для хостинга вроде Vercel/Netlify эти же значения можно указать в Environment Variables.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Важно: `VITE_*` переменные попадают в браузерный JavaScript. Для read-only Google Sheets это нормально только если API key ограничен в Google Cloud:
 
-## Expanding the Oxlint configuration
+- Application restrictions: HTTP referrers, только ваш домен
+- API restrictions: только Google Sheets API
+- сама таблица должна быть доступна на чтение по ссылке или публично для API key
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Если нужны приватные данные без раскрытия ключа в браузере, нужен backend/proxy или Apps Script web app.
+
+## GitHub Pages
+
+В проекте уже есть workflow `.github/workflows/deploy.yml`.
+
+Перед первым деплоем:
+
+1. Откройте GitHub repo `jassurgme2-jpg/FinanceUnimet`.
+2. Settings -> Secrets and variables -> Actions -> New repository secret.
+3. Добавьте secret с именем `VITE_GOOGLE_API_KEY` и значением вашего Google Sheets API key.
+4. Settings -> Pages -> Build and deployment -> Source: `GitHub Actions`.
+5. Сделайте push в `main`.
+
+После выполнения workflow сайт будет доступен по ссылке:
+
+```text
+https://jassurgme2-jpg.github.io/FinanceUnimet/
+```
+
+## Команды
+
+```bash
+npm run dev
+npm run build
+npm run lint
+```
