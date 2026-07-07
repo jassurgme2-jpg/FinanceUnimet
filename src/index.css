@@ -134,6 +134,96 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+.auth-page {
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+}
+
+.auth-card {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(20, 22, 33, 0.86);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary), var(--info));
+  box-shadow: var(--glow-primary);
+}
+
+.auth-brand h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.auth-brand span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form h2 {
+  margin-bottom: 4px;
+  font-size: 24px;
+  text-wrap: balance;
+}
+
+.auth-form p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.auth-error {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--error-rgb), 0.3);
+  border-radius: var(--radius-sm);
+  background: var(--error-bg);
+  color: #fecdd3;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-submit {
+  min-height: 44px;
+  margin-top: 4px;
+}
+
 .app-container {
   display: flex;
   width: 100%;
@@ -193,8 +283,14 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
   border: 1px solid transparent;
+}
+
+.btn:active {
+  transform: scale(0.96);
 }
 
 .btn-primary {
@@ -376,7 +472,9 @@ h1, h2, h3, h4, h5, h6 {
   color: white;
   font-family: var(--font-sans);
   font-size: 14px;
-  transition: all var(--transition-fast);
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
   outline: none;
 }
 

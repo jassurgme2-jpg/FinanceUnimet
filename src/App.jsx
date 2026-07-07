@@ -12,6 +12,7 @@ import DataImporter from "./components/DataImporter";
 import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
 import TransactionManager from "./components/TransactionManager";
 import BudgetGoalManager from "./components/BudgetGoalManager";
+import { logout } from "./auth";
 import {
   DEFAULT_APPS_SCRIPT_TOKEN,
   DEFAULT_APPS_SCRIPT_URL,
@@ -1111,6 +1112,11 @@ export default function App() {
     if (!success) loadMockData();
   };
 
+  const handleLogout = () => {
+    logout();
+    window.location.reload();
+  };
+
   return (
     <div className="app-container">
       {/* LEFT SIDEBAR NAVIGATION */}
@@ -1280,6 +1286,9 @@ export default function App() {
             </span>
             <button className="btn btn-secondary" style={{ padding: "8px 12px", fontSize: "12px" }} onClick={refreshDefaultData}>
               🔄 {sheetId && apiKey ? "Обновить базу" : "Сбросить данные"}
+            </button>
+            <button className="btn btn-secondary" style={{ padding: "8px 12px", fontSize: "12px" }} onClick={handleLogout}>
+              Выйти
             </button>
           </div>
         </header>
