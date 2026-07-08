@@ -7,7 +7,6 @@ import BalanceSheet from "./components/BalanceSheet";
 import AIAnalyst from "./components/AIAnalyst";
 import DataGraphView from "./components/DataGraphView";
 import DataImporter from "./components/DataImporter";
-import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
 import { logout } from "./auth";
 import {
   DEFAULT_AUTO_CONVERT,
@@ -83,7 +82,7 @@ export default function App() {
 
   // Google Sheets Metadata States
   const [sheetMetadata, setSheetMetadata] = useState([]);
-  const [selectedSheet, setSelectedSheet] = useState(localStorage.getItem("gs_sheet_name") || "");
+  const [, setSelectedSheet] = useState(localStorage.getItem("gs_sheet_name") || "");
   const [sheetId, setSheetId] = useState(localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID);
   const [apiKey, setApiKey] = useState(localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY);
 
@@ -972,96 +971,6 @@ export default function App() {
     }
   };
 
-  // Re-fetch transactions for a specific sheet or all sheets consolidated
-  const loadSheetData = async (sId, key, targetSheetName) => {
-    if (!targetSheetName || targetSheetName === "Все листы (Консолидировано)") {
-      return loadConsolidatedData(sId, key);
-    }
-    
-    try {
-      const range = `${targetSheetName}!A1:G2000`;
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sId}/values/${encodeURIComponent(range)}?key=${key}`;
-      
-      const res = await fetch(url);
-      if (!res.ok) {
-        let errMsg = `Не удалось загрузить данные с листа "${targetSheetName}".`;
-        try {
-          const errData = await res.json();
-          if (errData.error && errData.error.message) {
-            errMsg = `Google API: ${errData.error.message}`;
-          }
-        } catch (_) {}
-        throw new Error(errMsg);
-      }
-
-      const data = await res.json();
-      if (!data.values || data.values.length < 2) {
-        throw new Error(`Лист "${targetSheetName}" пуст или не содержит транзакций.`);
-      }
-
-      const [headers, ...rows] = data.values;
-      const mapping = {
-        dateIdx: headers.findIndex(h => /дата|date|день|число/i.test(h)),
-        typeIdx: headers.findIndex(h => /тип|type|движение|д\/р/i.test(h)),
-        amountIdx: headers.findIndex(h => /сумма|amount|расход|доход|платеж|величина|цена|итого|total/i.test(h)),
-        categoryIdx: headers.findIndex(h => /категория|статья|category/i.test(h)),
-        accountIdx: headers.findIndex(h => /счет|кошелек|касса|account|форма|оплат/i.test(h)),
-        counterpartyIdx: headers.findIndex(h => /контрагент|партнер|кому|от кого|получатель|отправитель|counterparty/i.test(h)),
-        descIdx: headers.findIndex(h => /описание|назначение|детали|комментарий|description/i.test(h)),
-      };
-
-      if (mapping.dateIdx === -1 || mapping.amountIdx === -1) {
-        const missing = [];
-        if (mapping.dateIdx === -1) missing.push('"Дата" (или Date/День)');
-        if (mapping.amountIdx === -1) missing.push('"Сумма" (или Amount/Расход)');
-        throw new Error(`В шапке листа "${targetSheetName}" отсутствуют обязательные колонки: ${missing.join(", ")}. Найденные колонки: ${headers.filter(Boolean).join(", ")}`);
-      }
-
-      const rate = Number(exchangeRate) || 12800;
-
-      const parsedTransactions = rows.map((row, idx) => {
-        const getVal = (idx) => idx !== -1 ? row[idx] || "" : "";
-        let amount = parseFloat(getVal(mapping.amountIdx).toString().replace(/[^\d.-]/g, "")) || 0;
-        
-        // Auto-convert UZS to USD if enabled and amount is > 10,000
-        if (autoConvert && Math.abs(amount) > 10000) {
-          amount = amount / rate;
-        }
-
-        const rawType = getVal(mapping.typeIdx);
-        let type = "Expense";
-        if (/доход|поступление|income|plus|in/i.test(rawType)) {
-          type = "Income";
-        }
-
-        return {
-          id: `gs-tx-${idx + 1}`,
-          date: getVal(mapping.dateIdx),
-          type: type,
-          amount: Math.abs(amount),
-          category: getVal(mapping.categoryIdx),
-          account: getVal(mapping.accountIdx),
-          counterparty: getVal(mapping.counterpartyIdx),
-          description: getVal(mapping.descIdx)
-        };
-      }).filter(tx => tx.date && tx.amount);
-
-      if (parsedTransactions.length === 0) {
-        throw new Error(`На листе "${targetSheetName}" найдено 0 транзакций с заполненной датой и ненулевой суммой.`);
-      }
-
-      setTransactions(parsedTransactions);
-      setBalanceSourceData(null);
-      setSelectedSheet(targetSheetName);
-      setSourceName(`Google Sheets (Лист: ${targetSheetName})`);
-      localStorage.setItem("gs_sheet_name", targetSheetName);
-      return true;
-    } catch (err) {
-      alert(`Ошибка при смене листа: ${err.message}`);
-      return false;
-    }
-  };
-
   const refreshDefaultData = async () => {
     const defaultSheetId = sheetId || localStorage.getItem("gs_sheet_id") || DEFAULT_GOOGLE_SHEET_ID;
     const defaultApiKey = apiKey || localStorage.getItem("gs_api_key") || DEFAULT_GOOGLE_API_KEY;
@@ -1178,22 +1087,6 @@ export default function App() {
             🕸️ Схема данных (Graph)
           </button>
 
-          {sheetMetadata.length > 0 && (
-            <button
-              className={`btn btn-secondary ${activeTab === "sheets" ? "btn-primary" : ""}`}
-              style={{ 
-                justifyContent: "flex-start", 
-                width: "100%", 
-                border: "none", 
-                backgroundColor: activeTab === "sheets" ? "var(--primary)" : "transparent",
-                animation: "fadeIn 0.3s forwards"
-              }}
-              onClick={() => setActiveTab("sheets")}
-            >
-              📁 Листы таблицы ({sheetMetadata.length})
-            </button>
-          )}
-
         </nav>
 
         {!HAS_HOSTED_GOOGLE_CONFIG && (
@@ -1266,16 +1159,6 @@ export default function App() {
 
           {activeTab === "graph" && (
             <DataGraphView sheetMetadata={sheetMetadata} />
-          )}
-
-          {activeTab === "sheets" && (
-            <GoogleSheetsTabs 
-              sheetMetadata={sheetMetadata}
-              selectedSheet={selectedSheet}
-              sheetId={sheetId}
-              apiKey={apiKey}
-              onSelectSheet={(name) => loadSheetData(sheetId, apiKey, name)}
-            />
           )}
 
           {!HAS_HOSTED_GOOGLE_CONFIG && activeTab === "import" && (
