@@ -4,7 +4,6 @@ import DashboardOverview from "./components/DashboardOverview";
 import PnLReport from "./components/PnLReport";
 import CashFlowReport from "./components/CashFlowReport";
 import BalanceSheet from "./components/BalanceSheet";
-import ReconciliationAct from "./components/ReconciliationAct";
 import DataGraphView from "./components/DataGraphView";
 import DataImporter from "./components/DataImporter";
 import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
@@ -1163,14 +1162,6 @@ export default function App() {
           </button>
 
           <button
-            className={`btn btn-secondary ${activeTab === "reconciliation" ? "btn-primary" : ""}`}
-            style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "reconciliation" ? "var(--primary)" : "transparent" }}
-            onClick={() => setActiveTab("reconciliation")}
-          >
-            🤝 Акт сверки
-          </button>
-
-          <button
             className={`btn btn-secondary ${activeTab === "graph" ? "btn-primary" : ""}`}
             style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "graph" ? "var(--primary)" : "transparent" }}
             onClick={() => setActiveTab("graph")}
@@ -1258,10 +1249,6 @@ export default function App() {
 
           {activeTab === "balance" && (
             <BalanceSheet transactions={transactions} balanceSourceData={balanceSourceData} />
-          )}
-
-          {activeTab === "reconciliation" && (
-            <ReconciliationAct transactions={transactions} />
           )}
 
           {activeTab === "graph" && (

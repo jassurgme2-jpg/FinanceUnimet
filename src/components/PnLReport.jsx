@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { formatCurrency, getMonthNameRU } from "../financialCalculations";
+import { buildPnlFileName, downloadPnlReport, sharePnlReport } from "../utils/excelExport";
 
 const DEFAULT_PNL_START_DATE = "2024-10-01";
 const DEFAULT_PNL_END_DATE = "2026-05-31";
@@ -364,6 +365,103 @@ export default function PnLReport({ transactions }) {
   const monthlyNetProfit = periods.map((m, idx) => monthlyPBT[idx] - monthlyIncomeTax[idx]);
   const totalNetProfit = totalPBT - totalIncomeTax;
   const pnlTableMinWidth = `${Math.max(980, 260 + 80 + periods.length * 118 + 130 + 90)}px`;
+  const getMonthEndDate = (dateStr) => {
+    const [year, month] = (dateStr || "").split("-").map(Number);
+    if (!year || !month) return dateStr || maxTxDate;
+    return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  };
+  const reportDateRange = (() => {
+    if (filterMode === "asOf") return { startDate: minTxDate, endDate: targetDate };
+    if (filterMode === "month") return { startDate: `${targetDate.substring(0, 7)}-01`, endDate: getMonthEndDate(targetDate) };
+    if (filterMode === "day") return { startDate: targetDate, endDate: targetDate };
+    if (filterMode === "range") return { startDate, endDate };
+    return { startDate: minTxDate, endDate: maxTxDate };
+  })();
+  const reportFilterLabel = (() => {
+    if (filterMode === "asOf") return `На дату ${formatRussianDate(targetDate)}`;
+    if (filterMode === "month") return `За месяц ${getMonthNameRU(targetDate.substring(0, 7))}`;
+    if (filterMode === "day") return `За день ${formatRussianDate(targetDate)}`;
+    if (filterMode === "range") return `${formatRussianDate(startDate)} - ${formatRussianDate(endDate)}`;
+    return "Все время";
+  })();
+  const revenueBase = Math.abs(totalRevenue);
+  const percentOfRevenue = (value, useAbsolute = false) => {
+    if (!revenueBase) return 0;
+    return (useAbsolute ? Math.abs(value) : value) / revenueBase;
+  };
+  const asExpense = (value) => {
+    const amount = Math.abs(Number(value || 0));
+    return amount === 0 ? 0 : -amount;
+  };
+  const expenseSeries = (values) => values.map(asExpense);
+  const createExportRow = (label, values, total, kind, options = {}) => ({
+    label,
+    values,
+    total,
+    kind,
+    indent: options.indent || 0,
+    share: percentOfRevenue(options.shareValue ?? total, Boolean(options.shareAbsolute))
+  });
+  const addCategoryRows = (rows, sectionMap, options = {}) => {
+    Object.entries(sectionMap).forEach(([cat, catMap]) => {
+      const rawValues = periods.map(m => catMap[m] || 0);
+      const rawTotal = getCategoryTotal(catMap);
+      const values = options.expense ? expenseSeries(rawValues) : rawValues;
+      const total = options.expense ? asExpense(rawTotal) : rawTotal;
+      rows.push(createExportRow(cat, values, total, "detail", {
+        indent: 1,
+        shareAbsolute: Boolean(options.expense)
+      }));
+    });
+  };
+  const pnlExportRows = (() => {
+    const rows = [];
+    rows.push(createExportRow("Выручка, нетто без НДС", monthlyRevenue, totalRevenue, "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.revenue);
+    rows.push(createExportRow("Себестоимость продаж", expenseSeries(monthlyCOGS), asExpense(totalCOGS), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.cogs, { expense: true });
+    rows.push(createExportRow("Валовая прибыль", monthlyGrossProfit, totalGrossProfit, "subtotal"));
+    rows.push(createExportRow("Коммерческие расходы", expenseSeries(monthlyDistribution), asExpense(totalDistribution), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.distribution, { expense: true });
+    rows.push(createExportRow("Административные расходы", expenseSeries(monthlyAdmin), asExpense(totalAdmin), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.admin, { expense: true });
+    rows.push(createExportRow("Прочие операционные расходы (налоги)", expenseSeries(monthlyOtherTax), asExpense(totalOtherTax), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.otherTax, { expense: true });
+    rows.push(createExportRow("Операционная прибыль / (убыток)", monthlyOperatingProfit, totalOperatingProfit, "subtotal"));
+    rows.push(createExportRow("Прочие доходы / (расходы)", monthlyOtherIncome, totalOtherIncome, "section"));
+    addCategoryRows(rows, pnl.otherIncome);
+    rows.push(createExportRow("Финансовые расходы", expenseSeries(monthlyFinance), asExpense(totalFinance), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.finance, { expense: true });
+    rows.push(createExportRow("Прибыль / (убыток) до налогообложения", monthlyPBT, totalPBT, "subtotal"));
+    rows.push(createExportRow("Расход по налогу на прибыль", expenseSeries(monthlyIncomeTax), asExpense(totalIncomeTax), "section", { shareAbsolute: true }));
+    addCategoryRows(rows, pnl.incomeTax, { expense: true });
+    rows.push(createExportRow("Прибыль / (убыток) за период", monthlyNetProfit, totalNetProfit, "total"));
+    return rows;
+  })();
+  const pnlExportPayload = {
+    title: "Отчет о прибылях и убытках (PnL)",
+    subtitle: `${reportFilterLabel}; разрез: ${selectedPeriodLabel}`,
+    fileName: buildPnlFileName({ ...reportDateRange, filterMode }),
+    columns: periods.map(getPeriodName),
+    meta: [
+      ["Фильтр", reportFilterLabel],
+      ["Транзакций в отчете", filteredTxCount]
+    ],
+    rows: pnlExportRows
+  };
+  const handleDownloadExcel = () => {
+    if (periods.length === 0) return;
+    downloadPnlReport(pnlExportPayload);
+  };
+  const handleShareExcel = async () => {
+    if (periods.length === 0) return;
+    try {
+      await sharePnlReport(pnlExportPayload);
+    } catch (err) {
+      console.error("Не удалось отправить PnL Excel-файл:", err);
+      downloadPnlReport(pnlExportPayload);
+    }
+  };
 
   return (
     <div className="animate-fade-in report-page pnl-report-page" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -670,7 +768,36 @@ export default function PnLReport({ transactions }) {
               Построен в соответствии с алгоритмом расчета ваших Google таблиц. Отображает доходы, расходы и прибыль по периодам.
             </p>
           </div>
-          <div className="report-actions" style={{ display: "flex", gap: "10px" }}>
+          <div className="report-actions" style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleDownloadExcel}
+              disabled={periods.length === 0}
+              title="Скачать PnL в Excel"
+              style={{ minHeight: "40px", padding: "8px 12px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "8px" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <path d="M7 10l5 5 5-5"/>
+                <path d="M12 15V3"/>
+              </svg>
+              Скачать Excel
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleShareExcel}
+              disabled={periods.length === 0}
+              title="Отправить PnL Excel-файлом"
+              style={{ minHeight: "40px", padding: "8px 12px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "8px" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <path d="M22 2L11 13"/>
+                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+              Отправить
+            </button>
             <button 
               className="btn btn-secondary" 
               onClick={() => setExpanded({
