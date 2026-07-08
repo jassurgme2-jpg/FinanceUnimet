@@ -5,6 +5,7 @@ import {
   formatCurrency,
   getBalanceSheetMonths
 } from "../financialCalculations";
+import { askGeminiAnalyst, hasGeminiProxy } from "../geminiClient";
 
 const EXPENSE_SECTIONS = ["cogs", "distribution", "admin", "otherTax", "finance", "incomeTax"];
 
@@ -35,6 +36,9 @@ const getTone = (netProfit, margin) => {
 
 export default function AIAnalyst({ transactions, balanceSourceData }) {
   const [question, setQuestion] = useState("Что сейчас важно по финансам?");
+  const [geminiAnswer, setGeminiAnswer] = useState("");
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [geminiError, setGeminiError] = useState("");
   const analysis = useMemo(() => {
     const months = getBalanceSheetMonths(transactions, balanceSourceData);
     const pnl = calculatePnL(transactions, months);
@@ -147,6 +151,53 @@ export default function AIAnalyst({ transactions, balanceSourceData }) {
   };
 
   const answer = buildAnswer(question);
+  const geminiContext = {
+    period: {
+      months: analysis.months,
+      latestMonth: analysis.latestMonth,
+      transactionCount: transactions.length
+    },
+    pnl: {
+      revenue: analysis.revenue,
+      expenses: analysis.expenses,
+      cogs: analysis.cogs,
+      distribution: analysis.distribution,
+      admin: analysis.admin,
+      otherTax: analysis.otherTax,
+      finance: analysis.finance,
+      incomeTax: analysis.incomeTax,
+      otherIncome: analysis.otherIncome,
+      grossProfit: analysis.grossProfit,
+      operatingProfit: analysis.operatingProfit,
+      netProfit: analysis.netProfit,
+      margin: analysis.margin,
+      grossMargin: analysis.grossMargin
+    },
+    balance: {
+      totalAssets: analysis.totalAssets,
+      fixedAssets: analysis.fixedAssets,
+      fixedAssetsShare: analysis.fixedAssetsShare,
+      cash: analysis.cash,
+      receivables: analysis.receivables,
+      payables: analysis.payables,
+      equity: analysis.equity,
+      balanceCheck: analysis.balanceCheck
+    },
+    topExpenses: analysis.topExpenses,
+    topRevenue: analysis.topRevenue
+  };
+  const handleAskGemini = async () => {
+    setGeminiLoading(true);
+    setGeminiError("");
+    try {
+      const text = await askGeminiAnalyst({ question, context: geminiContext });
+      setGeminiAnswer(text);
+    } catch (err) {
+      setGeminiError(err.message || "Не удалось получить ответ Gemini.");
+    } finally {
+      setGeminiLoading(false);
+    }
+  };
   const quickQuestions = [
     "Какие основные расходы?",
     "Какая прибыль и маржа?",
@@ -184,7 +235,7 @@ export default function AIAnalyst({ transactions, balanceSourceData }) {
           </p>
         </div>
         <span className="badge badge-info" style={{ minHeight: "32px", display: "inline-flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}>
-          {transactions.length} транзакций
+          {hasGeminiProxy ? "Gemini подключен" : `${transactions.length} транзакций`}
         </span>
       </div>
 
@@ -208,6 +259,21 @@ export default function AIAnalyst({ transactions, balanceSourceData }) {
             </p>
           </div>
 
+          {geminiAnswer && (
+            <div style={{ padding: "14px", borderRadius: "var(--radius-sm)", backgroundColor: "rgba(34, 211, 238, 0.08)", border: "1px solid rgba(34, 211, 238, 0.18)" }}>
+              <span style={{ color: "var(--info)", fontSize: "11px", fontWeight: 800, textTransform: "uppercase" }}>Ответ Gemini</span>
+              <p style={{ marginTop: "8px", color: "var(--text-primary)", fontSize: "14px", lineHeight: 1.7, whiteSpace: "pre-wrap", textWrap: "pretty" }}>
+                {geminiAnswer}
+              </p>
+            </div>
+          )}
+
+          {geminiError && (
+            <div style={{ padding: "12px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--error-bg)", color: "#fecdd3", fontSize: "13px", lineHeight: 1.5 }}>
+              {geminiError}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {quickQuestions.map((item) => (
               <button
@@ -230,6 +296,16 @@ export default function AIAnalyst({ transactions, balanceSourceData }) {
               placeholder="Спросите про расходы, прибыль, основные средства..."
               style={{ minHeight: "44px", flex: 1 }}
             />
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleAskGemini}
+              disabled={!hasGeminiProxy || geminiLoading || !transactions.length}
+              title={hasGeminiProxy ? "Спросить Gemini по финансовой сводке" : "Сначала настройте Gemini proxy URL"}
+              style={{ minHeight: "44px", padding: "10px 14px", whiteSpace: "nowrap" }}
+            >
+              {geminiLoading ? "Думаю..." : "Спросить Gemini"}
+            </button>
           </div>
         </div>
 

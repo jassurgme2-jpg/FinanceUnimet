@@ -41,6 +41,7 @@ jobs:
           VITE_BASE_PATH: /FinanceUnimet/
           VITE_GOOGLE_SHEET_ID: 1WHAVOJSBm5IkA6W0NMLtR9TthdrDcT0cQLXZDR90Gsw
           VITE_GOOGLE_API_KEY: ${{ secrets.VITE_GOOGLE_API_KEY }}
+          VITE_GEMINI_PROXY_URL: ${{ vars.VITE_GEMINI_PROXY_URL }}
           VITE_EXCHANGE_RATE: 12800
           VITE_AUTO_CONVERT: true
 
