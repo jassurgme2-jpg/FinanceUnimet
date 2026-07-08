@@ -4,6 +4,7 @@ import DashboardOverview from "./components/DashboardOverview";
 import PnLReport from "./components/PnLReport";
 import CashFlowReport from "./components/CashFlowReport";
 import BalanceSheet from "./components/BalanceSheet";
+import AIAnalyst from "./components/AIAnalyst";
 import DataGraphView from "./components/DataGraphView";
 import DataImporter from "./components/DataImporter";
 import GoogleSheetsTabs from "./components/GoogleSheetsTabs";
@@ -1162,6 +1163,14 @@ export default function App() {
           </button>
 
           <button
+            className={`btn btn-secondary ${activeTab === "ai" ? "btn-primary" : ""}`}
+            style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "ai" ? "var(--primary)" : "transparent" }}
+            onClick={() => setActiveTab("ai")}
+          >
+            ✨ ИИ Аналитик
+          </button>
+
+          <button
             className={`btn btn-secondary ${activeTab === "graph" ? "btn-primary" : ""}`}
             style={{ justifyContent: "flex-start", width: "100%", border: "none", backgroundColor: activeTab === "graph" ? "var(--primary)" : "transparent" }}
             onClick={() => setActiveTab("graph")}
@@ -1249,6 +1258,10 @@ export default function App() {
 
           {activeTab === "balance" && (
             <BalanceSheet transactions={transactions} balanceSourceData={balanceSourceData} />
+          )}
+
+          {activeTab === "ai" && (
+            <AIAnalyst transactions={transactions} balanceSourceData={balanceSourceData} />
           )}
 
           {activeTab === "graph" && (
