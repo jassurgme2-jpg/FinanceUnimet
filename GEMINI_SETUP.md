@@ -1,43 +1,69 @@
-# Gemini AI setup
+# Настройка Gemini AI
 
-The public GitHub Pages frontend must not contain the Gemini API key. Use a small proxy and expose only the proxy URL to the app.
+Публичный сайт на GitHub Pages не должен содержать Gemini API ключ. Если вставить ключ прямо во frontend, любой пользователь сможет увидеть его через DevTools.
 
-## 1. Create the proxy
-
-1. Open Google Apps Script.
-2. Create a new project.
-3. Copy `scripts/gemini-proxy-apps-script.js` into `Code.gs`.
-4. Open Project Settings -> Script Properties.
-5. Add:
+Правильная схема такая:
 
 ```text
-GEMINI_API_KEY=your_real_gemini_key
+FinanceFlow сайт -> Gemini proxy -> Google Gemini API
 ```
 
-6. Deploy -> New deployment -> Web app.
-7. Execute as: Me.
-8. Who has access: Anyone.
-9. Copy the `/exec` Web App URL.
+В приложение попадает только URL proxy, а реальный ключ хранится отдельно в Google Apps Script.
 
-## 2. Connect GitHub Pages
+## 1. Создать Gemini proxy
 
-In GitHub repo `jassurgme2-jpg/FinanceUnimet`:
+1. Откройте Google Apps Script.
+2. Создайте новый проект.
+3. Скопируйте код из `scripts/gemini-proxy-apps-script.js` в файл `Code.gs`.
+4. Откройте `Project Settings` -> `Script Properties`.
+5. Добавьте свойство:
 
-1. Settings -> Secrets and variables -> Actions -> Variables.
-2. Add repository variable:
+```text
+GEMINI_API_KEY=ваш_реальный_gemini_api_key
+```
+
+6. Нажмите `Deploy` -> `New deployment`.
+7. Тип выберите `Web app`.
+8. `Execute as`: `Me`.
+9. `Who has access`: `Anyone`.
+10. Нажмите `Deploy`.
+11. Скопируйте Web App URL, который заканчивается на `/exec`.
+
+## 2. Подключить proxy к GitHub Pages
+
+В репозитории `jassurgme2-jpg/FinanceUnimet`:
+
+1. Откройте `Settings`.
+2. Перейдите в `Secrets and variables` -> `Actions`.
+3. Откройте вкладку `Variables`.
+4. Добавьте repository variable:
 
 ```text
 VITE_GEMINI_PROXY_URL=https://script.google.com/macros/s/.../exec
 ```
 
-3. Push to `main` or rerun the Pages workflow.
+5. Сделайте push в `main` или вручную перезапустите workflow GitHub Pages.
 
-## 3. Local development
+## 3. Локальный запуск
 
-Add this to `.env.local`:
+Для локальной разработки добавьте в `.env.local`:
 
 ```text
 VITE_GEMINI_PROXY_URL=https://script.google.com/macros/s/.../exec
 ```
 
-Do not add `GEMINI_API_KEY` to `.env.local` for the Vite frontend.
+Не добавляйте `GEMINI_API_KEY` в `.env.local` для Vite frontend. Этот ключ должен быть только в Google Apps Script `Script Properties`.
+
+## 4. Как проверить
+
+1. Откройте сайт.
+2. Перейдите во вкладку `ИИ Аналитик`.
+3. Введите вопрос, например:
+
+```text
+Какие основные расходы и что с прибылью?
+```
+
+4. Нажмите `Спросить Gemini`.
+
+Если proxy URL не настроен, кнопка будет неактивна, а локальный аналитик продолжит работать без Gemini.
