@@ -67,3 +67,22 @@ VITE_GEMINI_PROXY_URL=https://script.google.com/macros/s/.../exec
 4. Нажмите `Спросить Gemini`.
 
 Если proxy URL не настроен, кнопка будет неактивна, а локальный аналитик продолжит работать без Gemini.
+
+## 5. Частая ошибка
+
+Если сайт показывает:
+
+```text
+GEMINI_API_KEY is not configured in Script Properties
+```
+
+значит ключ в Google Apps Script добавлен неправильно или не сохранён.
+
+Проверьте `Project Settings` -> `Script Properties`:
+
+```text
+Property: GEMINI_API_KEY
+Value:    ваш_реальный_gemini_api_key
+```
+
+Не пишите `GEMINI_API_KEY=ключ` в одном поле. Название свойства и сам ключ должны быть в разных полях. После исправления нажмите `Save script properties`.
